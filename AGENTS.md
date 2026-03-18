@@ -14,6 +14,8 @@ Implementation code should follow the structure defined in `tech-spec.md`: `src/
 
 Use `pnpm` exclusively for this repository. Do not use `bun install`, `npm install`, or commit lockfiles from other package managers.
 
+Before running any `node`, `pnpm`, `tsc`, `tsx`, or other Node.js-based command, run `nvm use` in the repository root so the shell uses the version declared in `.nvmrc`.
+
 - `pnpm install`: install and lock dependencies.
 - `pnpm build`: compile TypeScript to `dist/`.
 - `pnpm test`: run the Vitest suite.
