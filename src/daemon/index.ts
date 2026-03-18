@@ -1,5 +1,7 @@
 import { bootstrap } from "./bootstrap.js";
-import { logger } from "../shared/logger.js";
+import { getLogger } from "../shared/logger.js";
+
+const logger = getLogger("daemon");
 
 export async function runDaemon(): Promise<void> {
   const context = bootstrap();
