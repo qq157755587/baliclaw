@@ -6,11 +6,12 @@ import { queryAgent } from "./sdk.js";
 export class AgentService {
   async handleMessage(message: InboundMessage, cwd: string, sessionId = buildTelegramDirectSessionId(message)): Promise<string> {
     try {
-      return await queryAgent({
+      const result = await queryAgent({
         prompt: message.text,
         sessionId,
         cwd
       });
+      return result.text;
     } catch (error) {
       throw toAppError(error, {
         message: "Failed to query runtime agent",
