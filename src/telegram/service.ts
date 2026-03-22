@@ -1,9 +1,123 @@
+import { Bot, GrammyError, HttpError } from "grammy";
+import type { Logger } from "pino";
+import { getLogger } from "../shared/logger.js";
+import type { InboundMessage } from "../shared/types.js";
+import {
+  normalizeTelegramUpdate,
+  type TelegramUpdate
+} from "./normalize.js";
+
+export interface TelegramServiceContext {
+  update: TelegramUpdate;
+}
+
+export interface TelegramPollingBot {
+  on(filter: "message", handler: (context: TelegramServiceContext) => MaybePromise<unknown>): void;
+  start(): Promise<void>;
+  stop(): Promise<void>;
+}
+
+export interface TelegramServiceOptions {
+  token?: string;
+  bot?: TelegramPollingBot;
+  enqueueInbound?: (message: InboundMessage) => MaybePromise<unknown>;
+  logger?: Logger;
+}
+
+type MaybePromise<T> = T | Promise<T>;
+
 export class TelegramService {
+  private bot: TelegramPollingBot | undefined;
+  private readonly token: string;
+  private readonly enqueueInbound: (message: InboundMessage) => MaybePromise<unknown>;
+  private readonly logger: Logger;
+  private started = false;
+
+  constructor(options: TelegramServiceOptions = {}) {
+    this.bot = options.bot;
+    this.token = options.token ?? "";
+    this.enqueueInbound = options.enqueueInbound ?? (() => undefined);
+    this.logger = options.logger ?? getLogger("telegram");
+
+    if (this.bot) {
+      this.registerMessageHandler(this.bot);
+    }
+  }
+
+  private registerMessageHandler(bot: TelegramPollingBot): void {
+    bot.on("message", (context) => {
+      const inbound = normalizeTelegramUpdate(context.update);
+
+      if (!inbound) {
+        return;
+      }
+
+      void Promise.resolve(this.enqueueInbound(inbound)).catch((error: unknown) => {
+        this.logger.error(
+          {
+            err: error,
+            senderId: inbound.senderId,
+            conversationId: inbound.conversationId
+          },
+          "failed to enqueue telegram message"
+        );
+      });
+    });
+  }
+
   async start(): Promise<void> {
-    await Promise.resolve();
+    if (this.started) {
+      return;
+    }
+
+    try {
+      const bot = this.bot ?? createTelegramBot(this.token);
+
+      if (!this.bot) {
+        this.bot = bot;
+        this.registerMessageHandler(bot);
+      }
+
+      await bot.start();
+      this.started = true;
+      this.logger.info("telegram polling started");
+    } catch (error) {
+      this.logger.error({ err: error }, "failed to start telegram polling");
+      throw toTelegramServiceError(error);
+    }
   }
 
   async stop(): Promise<void> {
-    await Promise.resolve();
+    if (!this.started) {
+      return;
+    }
+
+    await this.bot?.stop();
+    this.started = false;
+    this.logger.info("telegram polling stopped");
   }
+}
+
+export function createTelegramBot(token: string): TelegramPollingBot {
+  return new Bot(token);
+}
+
+function toTelegramServiceError(error: unknown): Error {
+  if (error instanceof GrammyError) {
+    return new Error(`Telegram API error ${error.error_code}: ${error.description}`, {
+      cause: error
+    });
+  }
+
+  if (error instanceof HttpError) {
+    return new Error(`Telegram network error: ${error.message}`, {
+      cause: error
+    });
+  }
+
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new Error(`Unknown Telegram error: ${String(error)}`);
 }
