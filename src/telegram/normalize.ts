@@ -2,6 +2,7 @@ import type { InboundMessage } from "../shared/types.js";
 
 export interface TelegramUser {
   id: number;
+  username?: string;
 }
 
 export interface TelegramChat {

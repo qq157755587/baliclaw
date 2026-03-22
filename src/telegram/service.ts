@@ -1,7 +1,8 @@
 import { Bot, GrammyError, HttpError } from "grammy";
 import type { Logger } from "pino";
+import type { PairingService } from "../auth/pairing-service.js";
 import { getLogger } from "../shared/logger.js";
-import type { InboundMessage } from "../shared/types.js";
+import type { DeliveryTarget, InboundMessage } from "../shared/types.js";
 import {
   normalizeTelegramUpdate,
   type TelegramUpdate
@@ -21,6 +22,8 @@ export interface TelegramServiceOptions {
   token?: string;
   bot?: TelegramPollingBot;
   enqueueInbound?: (message: InboundMessage) => MaybePromise<unknown>;
+  pairingService?: Pick<PairingService, "getOrCreatePendingRequest" | "isApprovedSender">;
+  sendText?: (target: DeliveryTarget, text: string) => MaybePromise<unknown>;
   logger?: Logger;
 }
 
@@ -30,6 +33,8 @@ export class TelegramService {
   private bot: TelegramPollingBot | undefined;
   private readonly token: string;
   private readonly enqueueInbound: (message: InboundMessage) => MaybePromise<unknown>;
+  private readonly pairingService: Pick<PairingService, "getOrCreatePendingRequest" | "isApprovedSender"> | undefined;
+  private readonly sendText: (target: DeliveryTarget, text: string) => MaybePromise<unknown>;
   private readonly logger: Logger;
   private started = false;
 
@@ -37,6 +42,8 @@ export class TelegramService {
     this.bot = options.bot;
     this.token = options.token ?? "";
     this.enqueueInbound = options.enqueueInbound ?? (() => undefined);
+    this.pairingService = options.pairingService;
+    this.sendText = options.sendText ?? (() => undefined);
     this.logger = options.logger ?? getLogger("telegram");
 
     if (this.bot) {
@@ -52,7 +59,7 @@ export class TelegramService {
         return;
       }
 
-      void Promise.resolve(this.enqueueInbound(inbound)).catch((error: unknown) => {
+      void this.handleInboundMessage(inbound, context.update).catch((error: unknown) => {
         this.logger.error(
           {
             err: error,
@@ -63,6 +70,35 @@ export class TelegramService {
         );
       });
     });
+  }
+
+  private async handleInboundMessage(inbound: InboundMessage, update: TelegramUpdate): Promise<void> {
+    if (this.pairingService && !await this.pairingService.isApprovedSender(inbound.senderId)) {
+      const pairingInput: { senderId: string; username?: string } = {
+        senderId: inbound.senderId
+      };
+
+      if (update.message?.from?.username) {
+        pairingInput.username = update.message.from.username;
+      }
+
+      const request = await this.pairingService.getOrCreatePendingRequest({
+        ...pairingInput
+      });
+
+      await this.sendText(
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: inbound.conversationId
+        },
+        `Your BaliClaw pairing code is ${request.code}. Ask an operator to approve it before sending more messages.`
+      );
+      return;
+    }
+
+    await this.enqueueInbound(inbound);
   }
 
   async start(): Promise<void> {

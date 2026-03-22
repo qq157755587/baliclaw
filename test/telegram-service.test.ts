@@ -78,6 +78,80 @@ describe("TelegramService", () => {
     });
   });
 
+  it("sends a pairing code and skips enqueue for unauthorized senders", async () => {
+    const bot = new FakeTelegramBot();
+    const enqueueInbound = vi.fn();
+    const sendText = vi.fn();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(false),
+      getOrCreatePendingRequest: vi.fn().mockResolvedValue({
+        code: "ABCD2345",
+        senderId: "42",
+        username: "alice",
+        createdAt: "2026-03-22T10:00:00.000Z",
+        expiresAt: "2026-03-22T11:00:00.000Z"
+      })
+    };
+
+    new TelegramService({ bot, enqueueInbound, pairingService, sendText });
+
+    bot.handler?.({
+      update: {
+        message: {
+          from: { id: 42, username: "alice" },
+          chat: { id: 42, type: "private" },
+          text: "hello"
+        }
+      }
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(pairingService.isApprovedSender).toHaveBeenCalledWith("42");
+    expect(pairingService.getOrCreatePendingRequest).toHaveBeenCalledWith({
+      senderId: "42",
+      username: "alice"
+    });
+    expect(sendText).toHaveBeenCalledWith(
+      {
+        channel: "telegram",
+        accountId: "default",
+        chatType: "direct",
+        conversationId: "42"
+      },
+      expect.stringContaining("ABCD2345")
+    );
+    expect(enqueueInbound).not.toHaveBeenCalled();
+  });
+
+  it("continues into the runtime queue for approved senders", async () => {
+    const bot = new FakeTelegramBot();
+    const enqueueInbound = vi.fn();
+    const sendText = vi.fn();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    };
+
+    new TelegramService({ bot, enqueueInbound, pairingService, sendText });
+
+    bot.handler?.({
+      update: {
+        message: {
+          from: { id: 7 },
+          chat: { id: 7, type: "private" },
+          text: "allowed"
+        }
+      }
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(enqueueInbound).toHaveBeenCalledTimes(1);
+    expect(sendText).not.toHaveBeenCalled();
+    expect(pairingService.getOrCreatePendingRequest).not.toHaveBeenCalled();
+  });
+
   it("returns from the handler immediately after queueing work", async () => {
     const bot = new FakeTelegramBot();
     let resolveEnqueue: (() => void) | undefined;

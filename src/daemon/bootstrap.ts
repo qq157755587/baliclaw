@@ -1,8 +1,10 @@
+import { PairingService } from "../auth/pairing-service.js";
 import type { Logger } from "pino";
 import { ConfigService } from "../config/service.js";
 import { ensureStateDirectories, getAppPaths, type AppPaths } from "../config/paths.js";
 import type { AppConfig } from "../config/schema.js";
 import { IpcServer } from "../ipc/server.js";
+import { createTelegramApi, sendTelegramText } from "../telegram/send.js";
 import { TelegramService } from "../telegram/service.js";
 import { getLogger } from "../shared/logger.js";
 import { createShutdownController, type ShutdownController } from "./shutdown.js";
@@ -41,6 +43,7 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     }),
     configService
   });
+  const pairingService = new PairingService();
   const telegramService = options.telegramService ?? new TelegramService();
   const shutdownController = createShutdownController(logger);
 
@@ -51,11 +54,32 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   });
 
   if (config.telegram.enabled) {
-    await telegramService.start();
+    const configuredTelegramService = options.telegramService ?? new TelegramService({
+      token: config.telegram.botToken,
+      pairingService,
+      logger: getLogger("telegram", {
+        level: config.logging.level
+      }),
+      sendText: async (target, text) => {
+        await sendTelegramText(target, text, createTelegramApi(config.telegram.botToken));
+      }
+    });
+
+    await configuredTelegramService.start();
     shutdownController.add({
       name: "telegram",
-      close: async () => telegramService.stop()
+      close: async () => configuredTelegramService.stop()
     });
+
+    return {
+      paths,
+      config,
+      configService,
+      logger,
+      ipcServer,
+      telegramService: configuredTelegramService,
+      shutdownController
+    };
   }
 
   shutdownController.add({
