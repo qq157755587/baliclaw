@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { runConfigGetCommand, runConfigSetCommand } from "./commands/config.js";
 import { runDaemonCommand } from "./commands/daemon.js";
-import { runPairingListCommand } from "./commands/pairing.js";
+import { runPairingApproveCommand, runPairingListCommand } from "./commands/pairing.js";
 import { runStatusCommand } from "./commands/status.js";
 
 const program = new Command();
@@ -38,11 +38,25 @@ configCommand
     console.log(await runConfigSetCommand(config, options));
   });
 
-program
-  .command("pairing:list")
-  .description("List approved pairings")
-  .action(async () => {
-    console.log(await runPairingListCommand());
+const pairingCommand = program
+  .command("pairing")
+  .description("Pairing request operations");
+
+pairingCommand
+  .command("list")
+  .description("List pending pairing requests for a channel")
+  .argument("<channel>", "pairing channel, for example telegram")
+  .action(async (channel: string) => {
+    console.log(await runPairingListCommand(channel));
+  });
+
+pairingCommand
+  .command("approve")
+  .description("Approve a pairing code for a channel")
+  .argument("<channel>", "pairing channel, for example telegram")
+  .argument("<code>", "pairing code to approve")
+  .action(async (channel: string, code: string) => {
+    console.log(await runPairingApproveCommand(channel, code));
   });
 
 const daemonCommand = program
