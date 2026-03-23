@@ -11,13 +11,24 @@ interface JsonResponse {
   body: unknown;
 }
 
-async function requestJson(socketPath: string, path: string): Promise<JsonResponse> {
+async function requestJson(
+  socketPath: string,
+  path: string,
+  init: { method?: "GET" | "POST"; body?: unknown } = {}
+): Promise<JsonResponse> {
   return await new Promise<JsonResponse>((resolve, reject) => {
+    const requestBody = init.body === undefined ? undefined : JSON.stringify(init.body);
     const req = request(
       {
         socketPath,
         path,
-        method: "GET"
+        method: init.method ?? "GET",
+        headers: requestBody
+          ? {
+              "content-type": "application/json",
+              "content-length": Buffer.byteLength(requestBody)
+            }
+          : undefined
       },
       (response) => {
         let raw = "";
@@ -35,6 +46,9 @@ async function requestJson(socketPath: string, path: string): Promise<JsonRespon
     );
 
     req.on("error", reject);
+    if (requestBody) {
+      req.write(requestBody);
+    }
     req.end();
   });
 }
@@ -88,6 +102,77 @@ describe("IpcServer", () => {
           error: {
             code: "IPC_ROUTE_NOT_FOUND",
             message: "No IPC route for GET /v1/missing"
+          }
+        }
+      });
+    } finally {
+      await server.stop();
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("serves pairing list and approve routes over the configured unix socket", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-ipc-pairing-"));
+    const paths = getAppPaths(home);
+    const server = new IpcServer({
+      paths,
+      pairingService: {
+        listPendingRequests: async () => [
+          {
+            code: "ABCD2345",
+            senderId: "42",
+            username: "alice",
+            createdAt: "2026-03-23T09:00:00.000Z",
+            expiresAt: "2026-03-23T10:00:00.000Z"
+          }
+        ],
+        approve: async () => ({
+          code: "ABCD2345",
+          senderId: "42",
+          username: "alice",
+          createdAt: "2026-03-23T09:00:00.000Z",
+          expiresAt: "2026-03-23T10:00:00.000Z"
+        })
+      } as never
+    });
+
+    try {
+      await server.start();
+
+      await expect(requestJson(paths.socketFile, "/v1/pairing/list?channel=telegram")).resolves.toEqual({
+        statusCode: 200,
+        body: {
+          channel: "telegram",
+          requests: [
+            {
+              code: "ABCD2345",
+              senderId: "42",
+              username: "alice",
+              createdAt: "2026-03-23T09:00:00.000Z",
+              expiresAt: "2026-03-23T10:00:00.000Z"
+            }
+          ]
+        }
+      });
+
+      await expect(
+        requestJson(paths.socketFile, "/v1/pairing/approve", {
+          method: "POST",
+          body: {
+            channel: "telegram",
+            code: "ABCD2345"
+          }
+        })
+      ).resolves.toEqual({
+        statusCode: 200,
+        body: {
+          channel: "telegram",
+          approved: {
+            code: "ABCD2345",
+            senderId: "42",
+            username: "alice",
+            createdAt: "2026-03-23T09:00:00.000Z",
+            expiresAt: "2026-03-23T10:00:00.000Z"
           }
         }
       });

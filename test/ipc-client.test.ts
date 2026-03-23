@@ -96,4 +96,42 @@ describe("IpcClient", () => {
     await expect(client.getConfig()).resolves.toEqual(config);
     await expect(client.setConfig(config)).resolves.toEqual(config);
   });
+
+  it("supports pairing list and approve over the shared transport", async () => {
+    const request = {
+      code: "ABCD2345",
+      senderId: "42",
+      username: "alice",
+      createdAt: "2026-03-23T09:00:00.000Z",
+      expiresAt: "2026-03-23T10:00:00.000Z"
+    };
+    const client = new IpcClient({
+      requestJson: async (path, init) => {
+        if (path === "/v1/pairing/list?channel=telegram") {
+          return {
+            statusCode: 200,
+            body: {
+              channel: "telegram",
+              requests: [request]
+            }
+          };
+        }
+
+        if (path === "/v1/pairing/approve" && init?.method === "POST") {
+          return {
+            statusCode: 200,
+            body: {
+              channel: "telegram",
+              approved: request
+            }
+          };
+        }
+
+        throw new Error(`unexpected path: ${path}`);
+      }
+    });
+
+    await expect(client.listPairingRequests("telegram")).resolves.toEqual([request]);
+    await expect(client.approvePairingCode("telegram", "ABCD2345")).resolves.toEqual(request);
+  });
 });

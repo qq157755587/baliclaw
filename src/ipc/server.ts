@@ -2,17 +2,24 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { mkdir, stat, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { Logger } from "pino";
+import { PairingService } from "../auth/pairing-service.js";
 import { appConfigSchema } from "../config/schema.js";
 import { ConfigService } from "../config/service.js";
 import { getAppPaths, type AppPaths } from "../config/paths.js";
 import { getLogger } from "../shared/logger.js";
 import type { AppStatus } from "../shared/types.js";
-import type { PingResponse, IpcErrorResponse } from "./schema.js";
+import { handlePairingApprove, handlePairingList } from "./handlers/pairing.js";
+import {
+  pairingApproveRequestSchema,
+  type PingResponse,
+  type IpcErrorResponse
+} from "./schema.js";
 
 export interface IpcServerOptions {
   paths?: AppPaths;
   logger?: Logger;
   configService?: ConfigService;
+  pairingService?: PairingService;
   getStatus?: () => Promise<AppStatus> | AppStatus;
 }
 
@@ -20,6 +27,7 @@ export class IpcServer {
   private readonly paths: AppPaths;
   private readonly logger: Logger;
   private readonly configService: ConfigService;
+  private readonly pairingService: PairingService;
   private readonly resolveStatus: () => Promise<AppStatus> | AppStatus;
   private server: Server | null = null;
 
@@ -27,6 +35,7 @@ export class IpcServer {
     this.paths = options.paths ?? getAppPaths();
     this.logger = options.logger ?? getLogger("ipc");
     this.configService = options.configService ?? new ConfigService(this.paths);
+    this.pairingService = options.pairingService ?? new PairingService();
     this.resolveStatus = options.getStatus ?? (() => ({
       ok: true,
       service: "baliclaw",
@@ -112,10 +121,40 @@ export class IpcServer {
         return;
       }
 
+      if (method === "GET" && url.pathname === "/v1/pairing/list") {
+        const channel = url.searchParams.get("channel");
+
+        if (channel !== "telegram") {
+          this.writeJson(response, 400, {
+            ok: false,
+            error: {
+              code: "IPC_INVALID_REQUEST",
+              message: "Pairing channel must be telegram"
+            }
+          } satisfies IpcErrorResponse);
+          return;
+        }
+
+        this.writeJson(response, 200, {
+          channel,
+          requests: await handlePairingList(this.pairingService)
+        });
+        return;
+      }
+
       if (method === "POST" && url.pathname === "/v1/config/set") {
         const body = appConfigSchema.parse(await this.readJsonBody(request));
         await this.configService.save(body);
         this.writeJson(response, 200, await this.configService.load());
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/v1/pairing/approve") {
+        const body = pairingApproveRequestSchema.parse(await this.readJsonBody(request));
+        this.writeJson(response, 200, {
+          channel: body.channel,
+          approved: await handlePairingApprove(this.pairingService, body.code)
+        });
         return;
       }
 

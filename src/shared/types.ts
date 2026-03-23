@@ -21,7 +21,7 @@ export interface DeliveryTarget {
 export interface PairingRequest {
   code: string;
   senderId: string;
-  username?: string;
+  username?: string | undefined;
   createdAt: string;
   expiresAt: string;
 }

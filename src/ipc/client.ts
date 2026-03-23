@@ -2,8 +2,15 @@ import { request } from "node:http";
 import { getAppPaths, type AppPaths } from "../config/paths.js";
 import { type AppConfig } from "../config/schema.js";
 import { AppError, appErrorCodes, toAppError } from "../shared/errors.js";
-import type { AppStatus } from "../shared/types.js";
-import { configResponseSchema, ipcErrorResponseSchema, pingResponseSchema, statusResponseSchema } from "./schema.js";
+import type { AppStatus, PairingRequest } from "../shared/types.js";
+import {
+  configResponseSchema,
+  ipcErrorResponseSchema,
+  pairingApproveResponseSchema,
+  pairingListResponseSchema,
+  pingResponseSchema,
+  statusResponseSchema
+} from "./schema.js";
 
 interface HttpJsonResponse {
   body: unknown;
@@ -50,6 +57,35 @@ export class IpcClient {
       method: "POST",
       body: config
     });
+  }
+
+  async listPairingRequests(channel: "telegram" = "telegram"): Promise<PairingRequest[]> {
+    const response = await this.performRequest(
+      `/v1/pairing/list?channel=${channel}`,
+      pairingListResponseSchema,
+      {
+        invalidMessage: "Invalid IPC pairing list response"
+      }
+    );
+
+    return response.requests;
+  }
+
+  async approvePairingCode(channel: "telegram", code: string): Promise<PairingRequest> {
+    const response = await this.performRequest(
+      "/v1/pairing/approve",
+      pairingApproveResponseSchema,
+      {
+        invalidMessage: "Invalid IPC pairing approve response",
+        method: "POST",
+        body: {
+          channel,
+          code
+        }
+      }
+    );
+
+    return response.approved;
   }
 
   private async performRequest<T>(

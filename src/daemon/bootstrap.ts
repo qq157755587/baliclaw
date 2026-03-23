@@ -46,14 +46,15 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   const logger = getLogger("daemon", {
     level: config.logging.level
   });
+  const pairingService = options.pairingService ?? new PairingService();
   const ipcServer = options.ipcServer ?? new IpcServer({
     paths,
     logger: getLogger("ipc", {
       level: config.logging.level
     }),
-    configService
+    configService,
+    pairingService
   });
-  const pairingService = options.pairingService ?? new PairingService();
   const sessionService = options.sessionService ?? new SessionService();
   const agentService = options.agentService ?? new AgentService({
     logger: getLogger("agent", {

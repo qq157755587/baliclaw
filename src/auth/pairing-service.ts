@@ -16,6 +16,17 @@ export interface CreatePairingRequestInput {
 export class PairingService {
   constructor(private readonly store = new PairingStore()) {}
 
+  async listPendingRequests(now = new Date()): Promise<PairingRequest[]> {
+    const pending = await this.store.loadPendingRequests();
+    const activeRequests = pruneExpiredRequests(pending.requests, now);
+
+    if (activeRequests.length !== pending.requests.length) {
+      await this.store.savePendingRequests({ requests: activeRequests });
+    }
+
+    return activeRequests;
+  }
+
   async listApprovedSenders(): Promise<string[]> {
     const data = await this.store.loadAllowlist();
     return data.approvedSenderIds;
