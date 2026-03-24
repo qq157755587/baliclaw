@@ -8,7 +8,9 @@ import { ConfigService } from "../config/service.js";
 import { getAppPaths, type AppPaths } from "../config/paths.js";
 import { getLogger } from "../shared/logger.js";
 import type { AppStatus } from "../shared/types.js";
+import { handleConfigGet, handleConfigSet } from "./handlers/config.js";
 import { handlePairingApprove, handlePairingList } from "./handlers/pairing.js";
+import { handleStatus } from "./handlers/status.js";
 import {
   pairingApproveRequestSchema,
   type PingResponse,
@@ -115,12 +117,12 @@ export class IpcServer {
       }
 
       if (method === "GET" && url.pathname === "/v1/status") {
-        this.writeJson(response, 200, await this.getStatus());
+        this.writeJson(response, 200, await handleStatus(() => this.getStatus()));
         return;
       }
 
       if (method === "GET" && url.pathname === "/v1/config") {
-        this.writeJson(response, 200, await this.configService.load());
+        this.writeJson(response, 200, await handleConfigGet(this.configService));
         return;
       }
 
@@ -147,14 +149,7 @@ export class IpcServer {
 
       if (method === "POST" && url.pathname === "/v1/config/set") {
         const body = appConfigSchema.parse(await this.readJsonBody(request));
-        await this.configService.save(body);
-        this.writeJson(
-          response,
-          200,
-          this.reloadConfig
-            ? await this.reloadConfig()
-            : await this.configService.load()
-        );
+        this.writeJson(response, 200, await handleConfigSet(this.configService, body, this.reloadConfig));
         return;
       }
 

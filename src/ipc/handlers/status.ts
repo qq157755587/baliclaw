@@ -1,5 +1,7 @@
-import { IpcServer } from "../server.js";
+import type { AppStatus } from "../../shared/types.js";
 
-export async function handleStatus(server = new IpcServer()) {
-  return server.getStatus();
+export async function handleStatus(
+  getStatus: () => Promise<AppStatus> | AppStatus
+): Promise<AppStatus> {
+  return await getStatus();
 }
