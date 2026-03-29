@@ -55,6 +55,22 @@ describe("createTelegramTextSender", () => {
     });
   });
 
+  it("preserves markdown formatting when a long formatted message is chunked", async () => {
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+    const sender = createTelegramTextSender({ sendMessage });
+    const longBoldText = `**${"a".repeat(4500)}**`;
+
+    await sender.sendText(directTarget, longBoldText);
+
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(sendMessage.mock.calls[0]?.[1]).toMatch(/^<b>/);
+    expect(sendMessage.mock.calls[0]?.[1]).toMatch(/<\/b>$/);
+    expect(sendMessage.mock.calls[0]?.[2]).toEqual({ parse_mode: "HTML" });
+    expect(sendMessage.mock.calls[1]?.[1]).toMatch(/^<b>/);
+    expect(sendMessage.mock.calls[1]?.[1]).toMatch(/<\/b>$/);
+    expect(sendMessage.mock.calls[1]?.[2]).toEqual({ parse_mode: "HTML" });
+  });
+
   it("falls back to plain text when Telegram rejects HTML formatting", async () => {
     const sendMessage = vi.fn()
       .mockRejectedValueOnce(new Error("can't parse entities"))

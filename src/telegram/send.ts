@@ -1,6 +1,6 @@
 import { Api } from "grammy";
 import type { DeliveryTarget } from "../shared/types.js";
-import { renderTelegramHtmlText, splitTelegramMarkdownChunks } from "./format.js";
+import { renderTelegramHtmlText, splitTelegramHtmlChunks } from "./format.js";
 import { createTelegramClientOptions } from "./proxy.js";
 
 const TELEGRAM_TEXT_LIMIT = 4000;
@@ -39,13 +39,21 @@ export function createTelegramTextSender(api: TelegramTextApi) {
       validateText(text);
 
       try {
-        for (const chunk of splitTelegramMarkdownChunks(text, TELEGRAM_TEXT_LIMIT)) {
-          const htmlText = renderTelegramHtmlText(chunk);
+        const htmlText = renderTelegramHtmlText(text);
+        const plainChunks = splitPlainTextChunks(text, TELEGRAM_TEXT_LIMIT);
+        const htmlChunks = splitTelegramHtmlChunks(htmlText, TELEGRAM_TEXT_LIMIT);
+        const textChunks = splitPlainTextFallback(text, htmlChunks.length, TELEGRAM_TEXT_LIMIT);
 
+        for (let index = 0; index < htmlChunks.length; index += 1) {
+          const chunk = htmlChunks[index];
+          if (!chunk) {
+            continue;
+          }
+          const plainText = textChunks[index] ?? plainChunks[index] ?? text;
           try {
-            await api.sendMessage(target.conversationId, htmlText, { parse_mode: "HTML" });
+            await api.sendMessage(target.conversationId, chunk, { parse_mode: "HTML" });
           } catch {
-            await api.sendMessage(target.conversationId, chunk);
+            await api.sendMessage(target.conversationId, plainText);
           }
         }
       } catch (error) {
@@ -151,6 +159,44 @@ function validateText(text: string): void {
   if (text.length === 0) {
     throw new TelegramSendError("Telegram text message must not be empty");
   }
+}
+
+function splitPlainTextChunks(text: string, limit: number): string[] {
+  const normalizedLimit = Math.max(1, limit);
+  const normalizedText = text.replace(/\r\n/g, "\n");
+  const chunks: string[] = [];
+  let remaining = normalizedText;
+
+  while (remaining.length > normalizedLimit) {
+    const candidate = remaining.slice(0, normalizedLimit);
+    const splitIndex = Math.max(
+      candidate.lastIndexOf("\n\n"),
+      candidate.lastIndexOf("\n"),
+      candidate.lastIndexOf(" ")
+    );
+    const cut = splitIndex > normalizedLimit / 2 ? splitIndex : normalizedLimit;
+    chunks.push(remaining.slice(0, cut).trimEnd());
+    remaining = remaining.slice(cut).trimStart();
+  }
+
+  if (remaining.length > 0) {
+    chunks.push(remaining);
+  }
+
+  return chunks;
+}
+
+function splitPlainTextFallback(text: string, expectedChunks: number, limit: number): string[] {
+  const plainChunks = splitPlainTextChunks(text, limit);
+  if (plainChunks.length >= expectedChunks) {
+    return plainChunks;
+  }
+
+  const merged = [...plainChunks];
+  while (merged.length < expectedChunks) {
+    merged.push("");
+  }
+  return merged;
 }
 
 function formatError(error: unknown): string {

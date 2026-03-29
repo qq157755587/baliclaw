@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderTelegramHtmlText, splitTelegramMarkdownChunks } from "../src/telegram/format.js";
+import { renderTelegramHtmlText, splitTelegramHtmlChunks, splitTelegramMarkdownChunks } from "../src/telegram/format.js";
 
 describe("renderTelegramHtmlText", () => {
   it("renders core markdown patterns into Telegram HTML", () => {
@@ -24,5 +24,17 @@ describe("splitTelegramMarkdownChunks", () => {
 
     expect(chunks.length).toBe(2);
     expect(chunks[0]).toBe(`${"a".repeat(3980)}\nsecond line`);
+  });
+});
+
+describe("splitTelegramHtmlChunks", () => {
+  it("keeps HTML tags balanced across chunks", () => {
+    const chunks = splitTelegramHtmlChunks(`<b>${"a".repeat(5000)}</b>`, 4000);
+
+    expect(chunks.length).toBe(2);
+    expect(chunks[0]).toMatch(/^<b>/);
+    expect(chunks[0]).toMatch(/<\/b>$/);
+    expect(chunks[1]).toMatch(/^<b>/);
+    expect(chunks[1]).toMatch(/<\/b>$/);
   });
 });
