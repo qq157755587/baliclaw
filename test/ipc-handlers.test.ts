@@ -4,9 +4,11 @@ import { handleConfigGet, handleConfigSet } from "../src/ipc/handlers/config.js"
 import { handleStatus } from "../src/ipc/handlers/status.js";
 
 const config: AppConfig = {
-  telegram: {
-    enabled: false,
-    botToken: ""
+  channels: {
+    telegram: {
+      enabled: false,
+      botToken: ""
+    }
   },
   runtime: {
     workingDirectory: "/tmp/baliclaw"

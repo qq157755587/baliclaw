@@ -4,9 +4,11 @@ import { createLogger } from "../src/shared/logger.js";
 import { ReloadService } from "../src/daemon/reload-service.js";
 
 const initialConfig: AppConfig = {
-  telegram: {
-    enabled: false,
-    botToken: ""
+  channels: {
+    telegram: {
+      enabled: false,
+      botToken: ""
+    }
   },
   runtime: {
     workingDirectory: "/tmp/initial"

@@ -55,9 +55,11 @@ describe("IpcClient", () => {
 
   it("supports config get and set over the shared transport", async () => {
     const config: AppConfig = {
-      telegram: {
-        enabled: false,
-        botToken: ""
+      channels: {
+        telegram: {
+          enabled: false,
+          botToken: ""
+        }
       },
       runtime: {
         workingDirectory: "/tmp/baliclaw"

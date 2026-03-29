@@ -14,7 +14,7 @@ describe("ConfigService", () => {
       const service = new ConfigService(getAppPaths(home));
       const config = await service.load();
 
-      expect(config.telegram).toEqual({
+      expect(config.channels.telegram).toEqual({
         enabled: false,
         botToken: ""
       });
@@ -41,9 +41,11 @@ describe("ConfigService", () => {
       await writeFile(
         paths.configFile,
         `{
-          telegram: {
-            enabled: true,
-            botToken: "secret"
+          channels: {
+            telegram: {
+              enabled: true,
+              botToken: "secret"
+            }
           },
           runtime: {
             model: "claude-sonnet",
@@ -55,7 +57,7 @@ describe("ConfigService", () => {
 
       const config = await new ConfigService(paths).load();
 
-      expect(config.telegram).toEqual({
+      expect(config.channels.telegram).toEqual({
         enabled: true,
         botToken: "secret"
       });
@@ -76,9 +78,11 @@ describe("ConfigService", () => {
       await writeFile(
         paths.configFile,
         `{
-          telegram: {
-            enabled: false,
-            botToken: ""
+          channels: {
+            telegram: {
+              enabled: false,
+              botToken: ""
+            }
           },
           extra: true
         }\n`,
@@ -110,8 +114,10 @@ describe("ConfigService", () => {
       await writeFile(
         paths.configFile,
         `{
-          telegram: {
-            enabled: true
+          channels: {
+            telegram: {
+              enabled: true
+            }
           }
         }\n`,
         "utf8"
@@ -122,8 +128,8 @@ describe("ConfigService", () => {
         details: {
           issues: [
             expect.objectContaining({
-              path: "telegram.botToken",
-              message: "telegram.botToken is required when telegram.enabled is true"
+              path: "channels.telegram.botToken",
+              message: "channels.telegram.botToken is required when channels.telegram.enabled is true"
             })
           ]
         }
@@ -140,9 +146,11 @@ describe("ConfigService", () => {
 
     try {
       await service.save({
-        telegram: {
-          enabled: false,
-          botToken: ""
+        channels: {
+          telegram: {
+            enabled: false,
+            botToken: ""
+          }
         },
         runtime: {
           workingDirectory: "/tmp/workdir"

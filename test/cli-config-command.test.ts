@@ -6,9 +6,11 @@ import { runConfigGetCommand, runConfigSetCommand } from "../src/cli/commands/co
 import type { AppConfig } from "../src/config/schema.js";
 
 const config: AppConfig = {
-  telegram: {
-    enabled: false,
-    botToken: ""
+  channels: {
+    telegram: {
+      enabled: false,
+      botToken: ""
+    }
   },
   runtime: {
     workingDirectory: "/tmp/baliclaw"
@@ -40,15 +42,17 @@ describe("CLI config commands", () => {
     } as never;
 
     const output = await runConfigSetCommand(
-      `{ telegram: { enabled: false, botToken: "" }, runtime: { workingDirectory: "/tmp/updated" }, tools: { availableTools: ["Bash"] }, skills: { enabled: true, directories: [] }, logging: { level: "warn" } }`,
+      `{ channels: { telegram: { enabled: false, botToken: "" } }, runtime: { workingDirectory: "/tmp/updated" }, tools: { availableTools: ["Bash"] }, skills: { enabled: true, directories: [] }, logging: { level: "warn" } }`,
       {},
       client
     );
 
     expect(client.setConfig).toHaveBeenCalledWith({
-      telegram: {
-        enabled: false,
-        botToken: ""
+      channels: {
+        telegram: {
+          enabled: false,
+          botToken: ""
+        }
       },
       runtime: {
         workingDirectory: "/tmp/updated"
@@ -77,16 +81,18 @@ describe("CLI config commands", () => {
     try {
       await writeFile(
         file,
-        `{ telegram: { enabled: false, botToken: "" }, runtime: { workingDirectory: "/tmp/from-file" }, tools: { availableTools: ["Read"] }, skills: { enabled: true, directories: [] }, logging: { level: "debug" } }\n`,
+        `{ channels: { telegram: { enabled: false, botToken: "" } }, runtime: { workingDirectory: "/tmp/from-file" }, tools: { availableTools: ["Read"] }, skills: { enabled: true, directories: [] }, logging: { level: "debug" } }\n`,
         "utf8"
       );
 
       await runConfigSetCommand(undefined, { file }, client);
 
       expect(client.setConfig).toHaveBeenCalledWith({
-        telegram: {
-          enabled: false,
-          botToken: ""
+        channels: {
+          telegram: {
+            enabled: false,
+            botToken: ""
+          }
         },
         runtime: {
           workingDirectory: "/tmp/from-file"

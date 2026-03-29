@@ -7,6 +7,10 @@ const telegramConfigSchema = z.object({
   botToken: z.string().default("")
 }).strict();
 
+const channelsConfigSchema = z.object({
+  telegram: withObjectDefaults(telegramConfigSchema)
+}).strict();
+
 const runtimeConfigSchema = z.object({
   model: z.string().optional(),
   maxTurns: z.number().int().positive().optional(),
@@ -32,17 +36,17 @@ function withObjectDefaults<T extends z.ZodTypeAny>(schema: T) {
 }
 
 export const appConfigSchema = z.object({
-  telegram: withObjectDefaults(telegramConfigSchema),
+  channels: withObjectDefaults(channelsConfigSchema),
   runtime: withObjectDefaults(runtimeConfigSchema),
   tools: withObjectDefaults(toolsConfigSchema),
   skills: withObjectDefaults(skillsConfigSchema),
   logging: withObjectDefaults(loggingConfigSchema)
 }).strict().superRefine((config, context) => {
-  if (config.telegram.enabled && config.telegram.botToken.trim().length === 0) {
+  if (config.channels.telegram.enabled && config.channels.telegram.botToken.trim().length === 0) {
     context.addIssue({
       code: "custom",
-      message: "telegram.botToken is required when telegram.enabled is true",
-      path: ["telegram", "botToken"]
+      message: "channels.telegram.botToken is required when channels.telegram.enabled is true",
+      path: ["channels", "telegram", "botToken"]
     });
   }
 });

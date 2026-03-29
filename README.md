@@ -129,9 +129,11 @@ Phase 1 config shape:
 
 ```json5
 {
-  telegram: {
-    enabled: false,
-    botToken: ""
+  channels: {
+    telegram: {
+      enabled: false,
+      botToken: ""
+    }
   },
   runtime: {
     workingDirectory: "/absolute/path/to/workdir",
@@ -154,7 +156,7 @@ Phase 1 config shape:
 
 Notes:
 
-- `telegram.botToken` is required when `telegram.enabled` is `true`
+- `channels.telegram.botToken` is required when `channels.telegram.enabled` is `true`
 - `runtime.workingDirectory` defaults to the daemon process working directory
 - config writes go through daemon IPC, not direct CLI file writes
 - config updates are hot-reloaded by the daemon

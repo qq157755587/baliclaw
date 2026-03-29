@@ -38,9 +38,11 @@ class FakeProcess extends EventEmitter {
 }
 
 const defaultConfig: AppConfig = {
-  telegram: {
-    enabled: false,
-    botToken: ""
+  channels: {
+    telegram: {
+      enabled: false,
+      botToken: ""
+    }
   },
   runtime: {
     workingDirectory: "/tmp/baliclaw"
@@ -108,9 +110,11 @@ describe("bootstrap", () => {
         configService: {
           load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
             ...defaultConfig,
-            telegram: {
-              enabled: true,
-              botToken: "secret"
+            channels: {
+              telegram: {
+                enabled: true,
+                botToken: "secret"
+              }
             }
           })
         } as never
@@ -161,9 +165,11 @@ describe("bootstrap", () => {
         configService: {
           load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
             ...defaultConfig,
-            telegram: {
-              enabled: true,
-              botToken: "secret"
+            channels: {
+              telegram: {
+                enabled: true,
+                botToken: "secret"
+              }
             },
             runtime: {
               workingDirectory: "/tmp/runtime",
@@ -267,9 +273,11 @@ describe("bootstrap", () => {
         configService: {
           load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
             ...defaultConfig,
-            telegram: {
-              enabled: true,
-              botToken: "secret"
+            channels: {
+              telegram: {
+                enabled: true,
+                botToken: "secret"
+              }
             }
           })
         } as never
@@ -322,9 +330,11 @@ describe("bootstrap", () => {
     const loadedConfigs: AppConfig[] = [
       {
         ...defaultConfig,
-        telegram: {
-          enabled: true,
-          botToken: "token-1"
+        channels: {
+          telegram: {
+            enabled: true,
+            botToken: "token-1"
+          }
         },
         runtime: {
           workingDirectory: "/tmp/runtime-1",
@@ -345,9 +355,11 @@ describe("bootstrap", () => {
       },
       {
         ...defaultConfig,
-        telegram: {
-          enabled: true,
-          botToken: "token-1"
+        channels: {
+          telegram: {
+            enabled: true,
+            botToken: "token-1"
+          }
         },
         runtime: {
           workingDirectory: "/tmp/runtime-2",
@@ -453,16 +465,20 @@ describe("bootstrap", () => {
       load: vi.fn<() => Promise<AppConfig>>()
         .mockResolvedValueOnce({
           ...defaultConfig,
-          telegram: {
-            enabled: true,
-            botToken: "token-1"
+          channels: {
+            telegram: {
+              enabled: true,
+              botToken: "token-1"
+            }
           }
         })
         .mockResolvedValueOnce({
           ...defaultConfig,
-          telegram: {
-            enabled: true,
-            botToken: "token-2"
+          channels: {
+            telegram: {
+              enabled: true,
+              botToken: "token-2"
+            }
           }
         })
     } as never;
@@ -525,9 +541,11 @@ describe("bootstrap", () => {
         configService: {
           load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
             ...defaultConfig,
-            telegram: {
-              enabled: true,
-              botToken: "secret"
+            channels: {
+              telegram: {
+                enabled: true,
+                botToken: "secret"
+              }
             },
             runtime: {
               workingDirectory: "/tmp/shared-runtime"

@@ -77,10 +77,10 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   let activeTelegramService = options.telegramService ?? new TelegramService();
   const shutdownController = createShutdownController(logger);
   const sendText = options.sendText ?? (async (target, text) => {
-    await sendTelegramText(target, text, createTelegramApi(currentConfig.telegram.botToken));
+    await sendTelegramText(target, text, createTelegramApi(currentConfig.channels.telegram.botToken));
   });
   const createTypingHeartbeat = options.createTypingHeartbeat ?? ((target) =>
-    createTelegramTypingHeartbeat(target, createTelegramApi(currentConfig.telegram.botToken), {
+    createTelegramTypingHeartbeat(target, createTelegramApi(currentConfig.channels.telegram.botToken), {
       onError: (error) => {
         telegramLogger.warn(
           {
@@ -94,7 +94,7 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
 
   const createConfiguredTelegramService = (config: AppConfig): TelegramService => {
     const telegramServiceOptions: ConstructorParameters<typeof TelegramService>[0] = {
-      token: config.telegram.botToken,
+      token: config.channels.telegram.botToken,
       pairingService,
       logger: telegramLogger,
       enqueueInbound: async (message) => {
@@ -134,30 +134,30 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   };
 
   const reconcileTelegramService = async (nextConfig: AppConfig, previousConfig: AppConfig): Promise<void> => {
-    const telegramChanged = nextConfig.telegram.enabled !== previousConfig.telegram.enabled
-      || nextConfig.telegram.botToken !== previousConfig.telegram.botToken;
+    const telegramChanged = nextConfig.channels.telegram.enabled !== previousConfig.channels.telegram.enabled
+      || nextConfig.channels.telegram.botToken !== previousConfig.channels.telegram.botToken;
 
     if (!telegramChanged) {
       return;
     }
 
-    if (previousConfig.telegram.enabled) {
+    if (previousConfig.channels.telegram.enabled) {
       await activeTelegramService.stop();
     }
 
     if (options.telegramService) {
       activeTelegramService = options.telegramService;
-      if (nextConfig.telegram.enabled) {
+      if (nextConfig.channels.telegram.enabled) {
         await activeTelegramService.start();
       }
       return;
     }
 
-    activeTelegramService = nextConfig.telegram.enabled
+    activeTelegramService = nextConfig.channels.telegram.enabled
       ? createConfiguredTelegramService(nextConfig)
       : new TelegramService();
 
-    if (nextConfig.telegram.enabled) {
+    if (nextConfig.channels.telegram.enabled) {
       await activeTelegramService.start();
     }
   };
@@ -197,7 +197,7 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     close: async () => reloadService.stop()
   });
 
-  if (currentConfig.telegram.enabled) {
+  if (currentConfig.channels.telegram.enabled) {
     activeTelegramService = options.telegramService ?? createConfiguredTelegramService(currentConfig);
     await activeTelegramService.start();
   }
