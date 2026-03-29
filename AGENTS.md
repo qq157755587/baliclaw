@@ -16,6 +16,7 @@ Current Phase 1 implementation is centered around:
 - `src/daemon/reload-service.ts`: config file watching and hot reload application.
 - `src/ipc/server.ts` and `src/ipc/client.ts`: local Unix socket control plane.
 - `src/telegram/service.ts`: Telegram polling, normalization, pairing gate, and async enqueue.
+- `src/telegram/send.ts` and `src/telegram/format.ts`: Telegram outbound delivery, typing heartbeat, markdown-to-Telegram formatting, and chunking.
 - `src/runtime/agent-service.ts` and `src/runtime/sdk.ts`: Claude Agent SDK integration.
 
 ## Build, Test, and Development Commands
@@ -59,6 +60,13 @@ When changing daemon behavior, prefer extending existing service seams instead o
 - keep Telegram transport concerns in `src/telegram/`
 - keep Claude runtime prompt/tool/session behavior in `src/runtime/` and `src/session/`
 
+Current Telegram implementation notes:
+
+- outbound replies are rendered in `src/telegram/format.ts` and delivered in `src/telegram/send.ts`
+- long replies are chunked before send to stay within Telegram text limits
+- agent execution currently triggers explicit Telegram `sendChatAction("typing")` heartbeats while the runtime is working
+- the current markdown rendering path is Telegram-specific Phase 1 code; if future channel work aims for openclaw-style compatibility, prefer migrating toward a richer intermediate representation plus channel-specific renderers instead of extending string-based transforms further
+
 ## Testing Guidelines
 
 Vitest is the test framework. Name tests after the unit under test, for example `stable-key.test.ts` or `config-service.test.ts`. Prioritize coverage for the Phase 1 path: config loading, IPC behavior, pairing approval, stable session keys, and Telegram routing.
@@ -73,6 +81,7 @@ Phase 1 critical-path regressions should continue covering:
 - Telegram handler returning immediately after queueing work
 - unauthorized senders not reaching the runtime
 - authorized senders reaching the agent and getting a reply
+- Telegram outbound formatting, chunking, and typing behavior
 - `cwd` propagation without cross-session leakage under concurrency
 
 ## Commit & Pull Request Guidelines
@@ -99,4 +108,5 @@ Additional runtime notes:
 - `POST /v1/config/set` already triggers in-memory reload, so avoid adding extra manual refresh steps around it
 - config file watching is enabled in the daemon; updates to logging, runtime prompt/tool config, and Telegram token/enabled state are expected to hot-apply
 - Telegram proxying is configured at the BaliClaw daemon / Telegram transport boundary; do not rely on proxy env vars being inherited by Claude child processes
+- Telegram typing state is transport-driven: BaliClaw explicitly sends `sendChatAction("typing")` during agent execution rather than relying on Claude SDK streaming side effects
 - runtime session continuity now depends on the `business sessionId -> Claude session_id` mapping stored under `~/.baliclaw/sessions/`
