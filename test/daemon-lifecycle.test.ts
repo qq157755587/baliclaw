@@ -57,6 +57,12 @@ const defaultConfig: AppConfig = {
   }
 };
 
+function createNoopTypingHeartbeat() {
+  return {
+    stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+  };
+}
+
 describe("bootstrap", () => {
   it("creates state directories and loads config before returning context", async () => {
     const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-"));
@@ -98,6 +104,7 @@ describe("bootstrap", () => {
         paths,
         ipcServer,
         telegramService,
+        createTypingHeartbeat: createNoopTypingHeartbeat,
         configService: {
           load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
             ...defaultConfig,
@@ -136,12 +143,14 @@ describe("bootstrap", () => {
     const agentService = {
       handleMessage: vi.fn().mockResolvedValue("agent reply")
     } as never;
+    const typingHeartbeat = createNoopTypingHeartbeat();
 
     try {
       await bootstrap({
         paths,
         telegramBot: bot,
         sendText,
+        createTypingHeartbeat: () => typingHeartbeat,
         pairingService,
         sessionService,
         agentService,
@@ -215,6 +224,7 @@ describe("bootstrap", () => {
         },
         "agent reply"
       );
+      expect(typingHeartbeat.stop).toHaveBeenCalledTimes(1);
     } finally {
       await rm(home, { recursive: true, force: true });
     }
@@ -246,6 +256,7 @@ describe("bootstrap", () => {
         paths,
         telegramBot: bot,
         sendText,
+        createTypingHeartbeat: createNoopTypingHeartbeat,
         pairingService,
         sessionService,
         agentService,
@@ -366,6 +377,7 @@ describe("bootstrap", () => {
         configService,
         telegramBot: bot,
         sendText,
+        createTypingHeartbeat: createNoopTypingHeartbeat,
         pairingService,
         agentService,
         ipcServer: {
@@ -460,6 +472,7 @@ describe("bootstrap", () => {
         paths,
         configService,
         telegramService,
+        createTypingHeartbeat: createNoopTypingHeartbeat,
         ipcServer: {
           start: vi.fn<() => Promise<void>>().mockResolvedValue(),
           stop: vi.fn<() => Promise<void>>().mockResolvedValue()
@@ -502,6 +515,7 @@ describe("bootstrap", () => {
         paths,
         telegramBot: bot,
         sendText,
+        createTypingHeartbeat: createNoopTypingHeartbeat,
         pairingService,
         agentService,
         ipcServer: {

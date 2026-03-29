@@ -6,7 +6,12 @@ import type { AppConfig } from "../config/schema.js";
 import { IpcServer } from "../ipc/server.js";
 import { AgentService } from "../runtime/agent-service.js";
 import { SessionService } from "../session/service.js";
-import { createTelegramApi, sendTelegramText } from "../telegram/send.js";
+import {
+  createTelegramApi,
+  createTelegramTypingHeartbeat,
+  sendTelegramText,
+  type TelegramTypingHeartbeat
+} from "../telegram/send.js";
 import { TelegramService, type TelegramPollingBot } from "../telegram/service.js";
 import { getLogger } from "../shared/logger.js";
 import { ReloadService } from "./reload-service.js";
@@ -37,6 +42,9 @@ export interface BootstrapOptions {
   agentService?: AgentService;
   reloadService?: ReloadService;
   sendText?: (target: Parameters<typeof sendTelegramText>[0], text: string) => Promise<void>;
+  createTypingHeartbeat?: (
+    target: Parameters<typeof sendTelegramText>[0]
+  ) => TelegramTypingHeartbeat | Promise<TelegramTypingHeartbeat>;
 }
 
 export async function bootstrap(options: BootstrapOptions = {}): Promise<BootstrapContext> {
@@ -71,6 +79,18 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   const sendText = options.sendText ?? (async (target, text) => {
     await sendTelegramText(target, text, createTelegramApi(currentConfig.telegram.botToken));
   });
+  const createTypingHeartbeat = options.createTypingHeartbeat ?? ((target) =>
+    createTelegramTypingHeartbeat(target, createTelegramApi(currentConfig.telegram.botToken), {
+      onError: (error) => {
+        telegramLogger.warn(
+          {
+            err: error,
+            conversationId: target.conversationId
+          },
+          "failed to send telegram typing action"
+        );
+      }
+    }));
 
   const createConfiguredTelegramService = (config: AppConfig): TelegramService => {
     const telegramServiceOptions: ConstructorParameters<typeof TelegramService>[0] = {
@@ -81,21 +101,26 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
         await sessionService.runTurn(message, async (turnMessage, sessionId) => {
           const runtimeConfig = currentConfig;
           const agentRunOptions = buildAgentRunOptions(runtimeConfig, sessionId);
-          const reply = await agentService.handleMessage(turnMessage, agentRunOptions);
+          const deliveryTarget = {
+            channel: turnMessage.channel,
+            accountId: turnMessage.accountId,
+            chatType: turnMessage.chatType,
+            conversationId: turnMessage.conversationId
+          } as const;
+          const typingHeartbeat = await createTypingHeartbeat(deliveryTarget);
+          let reply: string;
+
+          try {
+            reply = await agentService.handleMessage(turnMessage, agentRunOptions);
+          } finally {
+            await typingHeartbeat.stop();
+          }
 
           if (reply.trim().length === 0) {
             return;
           }
 
-          await sendText(
-            {
-              channel: turnMessage.channel,
-              accountId: turnMessage.accountId,
-              chatType: turnMessage.chatType,
-              conversationId: turnMessage.conversationId
-            },
-            reply
-          );
+          await sendText(deliveryTarget, reply);
         });
       },
       sendText

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   TelegramSendError,
   createTelegramApi,
+  createTelegramTypingHeartbeat,
   createTelegramTextSender,
   sendTelegramText
 } from "../src/telegram/send.js";
@@ -104,5 +105,30 @@ describe("createTelegramApi", () => {
     const api = createTelegramApi("123:abc");
 
     expect(api).toHaveProperty("sendMessage");
+  });
+});
+
+describe("createTelegramTypingHeartbeat", () => {
+  it("sends typing immediately and on an interval until stopped", async () => {
+    vi.useFakeTimers();
+    const sendChatAction = vi.fn().mockResolvedValue({ ok: true });
+
+    try {
+      const heartbeat = createTelegramTypingHeartbeat(directTarget, { sendChatAction }, { intervalMs: 2000 });
+
+      await vi.runAllTicks();
+      await Promise.resolve();
+      expect(sendChatAction).toHaveBeenCalledTimes(1);
+      expect(sendChatAction).toHaveBeenNthCalledWith(1, "123456", "typing");
+
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(sendChatAction).toHaveBeenCalledTimes(3);
+
+      await heartbeat.stop();
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(sendChatAction).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
