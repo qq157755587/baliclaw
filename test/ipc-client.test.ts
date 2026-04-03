@@ -73,6 +73,9 @@ describe("IpcClient", () => {
       },
       logging: {
         level: "info"
+      },
+      mcp: {
+        servers: {}
       }
     };
     const client = new IpcClient({

@@ -64,19 +64,24 @@ async function setConfigPathValue(
     }
     const value = cursor[segment];
 
-    if (!isPlainObject(value)) {
+    if (value === undefined || value === null) {
+      const child: Record<string, unknown> = {};
+      cursor[segment] = child;
+      cursor = child;
+    } else if (!isPlainObject(value)) {
       throw new Error(`Unknown config path: ${path}`);
+    } else {
+      cursor = value;
     }
-
-    cursor = value;
   }
 
   const leaf = segments[segments.length - 1];
-  if (!leaf || !(leaf in cursor)) {
+  if (!leaf) {
     throw new Error(`Unknown config path: ${path}`);
   }
 
   cursor[leaf] = parseScalarOrJson5(rawValue);
+
   return await client.setConfig(appConfigSchema.parse(next));
 }
 

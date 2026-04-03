@@ -24,6 +24,9 @@ const config: AppConfig = {
   },
   logging: {
     level: "info"
+  },
+  mcp: {
+    servers: {}
   }
 };
 
@@ -66,6 +69,9 @@ describe("CLI config commands", () => {
       },
       logging: {
         level: "warn"
+      },
+      mcp: {
+        servers: {}
       }
     });
     expect(output).toContain("\"workingDirectory\": \"/tmp/updated\"");
@@ -106,6 +112,9 @@ describe("CLI config commands", () => {
         },
         logging: {
           level: "debug"
+        },
+        mcp: {
+          servers: {}
         }
       });
     } finally {
@@ -146,8 +155,92 @@ describe("CLI config commands", () => {
 
     await expect(
       runConfigSetCommand("value", { path: "channels.telegram.missing" }, client)
-    ).rejects.toThrow("Unknown config path: channels.telegram.missing");
+    ).rejects.toThrow(/unrecognized_keys/);
 
     expect(client.setConfig).not.toHaveBeenCalled();
+  });
+
+  it("creates a new MCP server entry via --path", async () => {
+    const client = {
+      getConfig: vi.fn<() => Promise<AppConfig>>().mockResolvedValue(config),
+      setConfig: vi.fn<(value: AppConfig) => Promise<AppConfig>>().mockImplementation(async (value) => value)
+    } as never;
+
+    await runConfigSetCommand(
+      '{ type: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-github"] }',
+      { path: "mcp.servers.github" },
+      client
+    );
+
+    expect(client.setConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mcp: {
+          servers: {
+            github: {
+              type: "stdio",
+              command: "npx",
+              args: ["-y", "@modelcontextprotocol/server-github"],
+              env: {}
+            }
+          }
+        }
+      })
+    );
+  });
+
+  it("creates intermediate objects for nested record paths", async () => {
+    const configWithGithub: AppConfig = {
+      ...config,
+      mcp: {
+        servers: {
+          github: {
+            type: "stdio" as const,
+            command: "npx",
+            args: ["-y", "@modelcontextprotocol/server-github"],
+            env: {}
+          }
+        }
+      }
+    };
+
+    const client = {
+      getConfig: vi.fn<() => Promise<AppConfig>>().mockResolvedValue(configWithGithub),
+      setConfig: vi.fn<(value: AppConfig) => Promise<AppConfig>>().mockImplementation(async (value) => value)
+    } as never;
+
+    await runConfigSetCommand("updated-npx", { path: "mcp.servers.github.command" }, client);
+
+    expect(client.setConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mcp: {
+          servers: {
+            github: expect.objectContaining({
+              command: "updated-npx"
+            })
+          }
+        }
+      })
+    );
+  });
+
+  it("creates a new server entry via nested field path", async () => {
+    const client = {
+      getConfig: vi.fn<() => Promise<AppConfig>>().mockResolvedValue(config),
+      setConfig: vi.fn<(value: AppConfig) => Promise<AppConfig>>().mockImplementation(async (value) => value)
+    } as never;
+
+    await runConfigSetCommand("npx", { path: "mcp.servers.github.command" }, client);
+
+    expect(client.setConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mcp: {
+          servers: {
+            github: expect.objectContaining({
+              command: "npx"
+            })
+          }
+        }
+      })
+    );
   });
 });

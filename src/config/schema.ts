@@ -2,6 +2,33 @@ import { z } from "zod";
 
 export const defaultAvailableTools = ["Bash", "Read", "Write", "Edit"] as const;
 
+function withObjectDefaults<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((value) => value ?? {}, schema);
+}
+
+const mcpServerStdioSchema = z.object({
+  type: z.literal("stdio").default("stdio"),
+  command: z.string(),
+  args: z.array(z.string()).default([]),
+  env: z.record(z.string(), z.string()).default({})
+}).strict();
+
+const mcpServerHttpSchema = z.object({
+  type: z.enum(["http", "sse"]),
+  url: z.string().url(),
+  headers: z.record(z.string(), z.string()).default({})
+}).strict();
+
+const mcpServerSchema = z.union([mcpServerStdioSchema, mcpServerHttpSchema]);
+
+const mcpConfigSchema = z.object({
+  servers: z.record(z.string(), mcpServerSchema).default({})
+}).strict();
+
+export type McpServerStdioConfig = z.infer<typeof mcpServerStdioSchema>;
+export type McpServerHttpConfig = z.infer<typeof mcpServerHttpSchema>;
+export type McpServerConfig = z.infer<typeof mcpServerSchema>;
+
 const telegramConfigSchema = z.object({
   enabled: z.boolean().default(false),
   botToken: z.string().default("")
@@ -31,16 +58,13 @@ const loggingConfigSchema = z.object({
   level: z.enum(["debug", "info", "warn", "error"]).default("info")
 }).strict();
 
-function withObjectDefaults<T extends z.ZodTypeAny>(schema: T) {
-  return z.preprocess((value) => value ?? {}, schema);
-}
-
 export const appConfigSchema = z.object({
   channels: withObjectDefaults(channelsConfigSchema),
   runtime: withObjectDefaults(runtimeConfigSchema),
   tools: withObjectDefaults(toolsConfigSchema),
   skills: withObjectDefaults(skillsConfigSchema),
-  logging: withObjectDefaults(loggingConfigSchema)
+  logging: withObjectDefaults(loggingConfigSchema),
+  mcp: withObjectDefaults(mcpConfigSchema)
 }).strict().superRefine((config, context) => {
   if (config.channels.telegram.enabled && config.channels.telegram.botToken.trim().length === 0) {
     context.addIssue({
