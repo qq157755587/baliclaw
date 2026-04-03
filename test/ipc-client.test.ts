@@ -69,7 +69,8 @@ describe("IpcClient", () => {
       },
       skills: {
         enabled: true,
-        directories: []
+        directories: [],
+        sdkNative: true
       },
       logging: {
         level: "info"

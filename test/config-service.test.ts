@@ -22,7 +22,8 @@ describe("ConfigService", () => {
       expect(config.tools.availableTools).toEqual(["Bash", "Read", "Write", "Edit"]);
       expect(config.skills).toEqual({
         enabled: true,
-        directories: []
+        directories: [],
+        sdkNative: true
       });
       expect(config.logging).toEqual({
         level: "info"

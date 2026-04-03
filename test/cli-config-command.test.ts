@@ -20,7 +20,8 @@ const config: AppConfig = {
   },
   skills: {
     enabled: true,
-    directories: []
+    directories: [],
+    sdkNative: true
   },
   logging: {
     level: "info"
@@ -71,7 +72,8 @@ describe("CLI config commands", () => {
       },
       skills: {
         enabled: true,
-        directories: []
+        directories: [],
+        sdkNative: true
       },
       logging: {
         level: "warn"
@@ -120,7 +122,8 @@ describe("CLI config commands", () => {
         },
         skills: {
           enabled: true,
-          directories: []
+          directories: [],
+          sdkNative: true
         },
         logging: {
           level: "debug"

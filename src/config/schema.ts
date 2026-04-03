@@ -57,7 +57,9 @@ const runtimeConfigSchema = z.object({
   model: z.string().optional(),
   maxTurns: z.number().int().positive().optional(),
   workingDirectory: z.string().default(process.cwd()),
-  systemPromptFile: z.string().optional()
+  systemPromptFile: z.string().optional(),
+  soulFile: z.string().optional(),
+  userFile: z.string().optional()
 }).strict();
 
 const toolsConfigSchema = z.object({
@@ -66,7 +68,8 @@ const toolsConfigSchema = z.object({
 
 const skillsConfigSchema = z.object({
   enabled: z.boolean().default(true),
-  directories: z.array(z.string()).default([])
+  directories: z.array(z.string()).default([]),
+  sdkNative: z.boolean().default(true)
 }).strict();
 
 const loggingConfigSchema = z.object({
