@@ -605,7 +605,7 @@ Phase 2 完成后，系统应满足：
 ### 阶段 C 验收：SDK 集成
 
 - MCP servers 配置正确传入 `query()`
-- `settingSources` 按 Skills 开关正确设置
+- `settingSources` 按 SDK filesystem settings 开关正确设置
 - SubAgents 配置正确构建并传入 `query()`
 - MEMORY.md 内容和管理指令正确注入 prompt
 
