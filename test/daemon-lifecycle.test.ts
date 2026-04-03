@@ -52,10 +52,20 @@ const defaultConfig: AppConfig = {
   },
   skills: {
     enabled: true,
-    directories: []
+    directories: [],
+    sdkNative: true
   },
   logging: {
     level: "info"
+  },
+  mcp: {
+    servers: {}
+  },
+  agents: {},
+  memory: {
+    enabled: true,
+    globalEnabled: false,
+    maxLines: 200
   }
 };
 

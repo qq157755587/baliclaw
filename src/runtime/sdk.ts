@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { query as sdkQuery, type SDKMessage, type SDKResultError, type SDKResultSuccess } from "@anthropic-ai/claude-agent-sdk";
+import { query as sdkQuery, type SDKMessage, type SDKResultError, type SDKResultSuccess, type McpServerConfig as SdkMcpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import { buildSystemPrompt } from "./prompts.js";
 import { loadPromptOnlySkills } from "./skills.js";
 import { getPhase1ToolPolicy } from "./tool-policy.js";
@@ -14,6 +14,7 @@ export interface QueryRequest {
   systemPromptFile?: string;
   skillDirectories?: string[];
   tools?: string[];
+  mcpServers?: Record<string, SdkMcpServerConfig>;
 }
 
 export interface QueryUsage {
@@ -123,6 +124,7 @@ interface SdkQueryOptions {
   permissionMode: "bypassPermissions";
   allowDangerouslySkipPermissions: true;
   tools: string[];
+  mcpServers?: Record<string, SdkMcpServerConfig>;
   stderr: (data: string) => void;
   systemPrompt: {
     type: "preset";
@@ -161,6 +163,10 @@ function createSdkQueryOptions(params: {
 
   if (params.request.model) {
     options.model = params.request.model;
+  }
+
+  if (params.request.mcpServers && Object.keys(params.request.mcpServers).length > 0) {
+    options.mcpServers = params.request.mcpServers;
   }
 
   return options;

@@ -249,5 +249,9 @@ function buildAgentRunOptions(config: AppConfig, sessionId: string): Parameters<
     options.skillDirectories = config.skills.directories;
   }
 
+  if (Object.keys(config.mcp.servers).length > 0) {
+    options.mcpServers = config.mcp.servers;
+  }
+
   return options;
 }

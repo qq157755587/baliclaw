@@ -1,4 +1,5 @@
 import type { Logger } from "pino";
+import type { McpServerConfig as SdkMcpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import type { InboundMessage } from "../shared/types.js";
 import { buildTelegramDirectSessionId } from "../session/stable-key.js";
 import { getLogger } from "../shared/logger.js";
@@ -13,6 +14,7 @@ export interface AgentRunOptions {
   systemPromptFile?: string;
   skillDirectories?: string[];
   tools?: string[];
+  mcpServers?: Record<string, SdkMcpServerConfig>;
 }
 
 export interface AgentServiceDependencies {
@@ -68,6 +70,9 @@ export class AgentService {
       }
       if (options.tools) {
         request.tools = options.tools;
+      }
+      if (options.mcpServers) {
+        request.mcpServers = options.mcpServers;
       }
 
       const result = await this.runQueryAgent(request);
