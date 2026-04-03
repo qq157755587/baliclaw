@@ -15,12 +15,20 @@ export function getPhase1ToolPolicy(config?: Pick<AppConfig, "tools">): ToolPoli
 }
 
 export function getToolPolicy(
-  config: Pick<AppConfig, "tools" | "mcp" | "skills" | "agents">
+  config: {
+    tools: Pick<AppConfig["tools"], "availableTools">;
+    mcp: { servers: Record<string, unknown> };
+    skills: Pick<AppConfig["skills"], "sdkNative">;
+    agents: Record<string, unknown>;
+  }
 ): ToolPolicy {
   const tools = [...config.tools.availableTools];
 
   for (const serverName of Object.keys(config.mcp.servers)) {
-    tools.push(`mcp__${serverName}__*`);
+    const wildcard = `mcp__${serverName}__*`;
+    if (!tools.includes(wildcard)) {
+      tools.push(wildcard);
+    }
   }
 
   if (config.skills.sdkNative && !tools.includes("Skill")) {

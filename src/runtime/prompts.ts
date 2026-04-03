@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 
 const baseSystemPrompt = "You are the BaliClaw Phase 1 agent.";
 
@@ -21,23 +21,23 @@ export interface BuildSystemPromptOptions {
 
 export async function buildSystemPrompt(options: BuildSystemPromptOptions): Promise<string> {
   const sections: string[] = [baseSystemPrompt];
-  const soulContent = await readOptionalTextFile(options.soulFile ?? join(options.workingDirectory, "SOUL.md"));
-  const userContent = await readOptionalTextFile(options.userFile ?? join(options.workingDirectory, "USER.md"));
+  const soulFilePath = resolvePromptPath(options.workingDirectory, options.soulFile, "SOUL.md");
+  const userFilePath = resolvePromptPath(options.workingDirectory, options.userFile, "USER.md");
+  const soulContent = await readOptionalTextFile(soulFilePath);
+  const userContent = await readOptionalTextFile(userFilePath);
   const agentsContent = await readOptionalTextFile(join(options.workingDirectory, "AGENTS.md"));
 
   if (soulContent) {
     sections.push(renderSection("SOUL.md", soulContent));
   }
-  if (userContent) {
-    sections.push(renderUserSection(userContent));
-  }
+  sections.push(renderUserSection(userFilePath, userContent));
 
   if (agentsContent) {
     sections.push(renderSection("AGENTS.md", agentsContent));
   }
 
   if (options.systemPromptFile) {
-    const extraPrompt = await readOptionalTextFile(options.systemPromptFile);
+    const extraPrompt = await readOptionalTextFile(resolveOptionalPath(options.workingDirectory, options.systemPromptFile));
     if (extraPrompt) {
       sections.push(renderSection("SYSTEM PROMPT", extraPrompt));
     }
@@ -77,14 +77,15 @@ function renderSection(title: string, content: string): string {
   return `=== ${title} ===\n${content.trim()}`;
 }
 
-function renderUserSection(content: string): string {
+function renderUserSection(userFilePath: string, content: string | null): string {
   return [
     "=== USER.md ===",
-    "This file describes the user. Keep it updated when you learn durable preferences or context.",
-    "Use the Write or Edit tool to correct outdated information instead of appending duplicate notes.",
+    `This file describes the user and lives at ${userFilePath}. Keep it updated when you learn durable preferences or context.`,
+    "Use the Write or Edit tool to create or update this file, and correct outdated information instead of appending duplicate notes.",
     "Keep it concise and avoid sensitive information that does not improve future help.",
     "",
-    content.trim()
+    "## Current USER.md contents:",
+    content?.trim().length ? content.trim() : "(empty)"
   ].join("\n");
 }
 
@@ -120,4 +121,12 @@ function renderMemorySection(memoryFilePath: string, memoryContent: string): str
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
+
+function resolvePromptPath(workingDirectory: string, configuredPath: string | undefined, fallbackName: string): string {
+  return resolveOptionalPath(workingDirectory, configuredPath ?? join(workingDirectory, fallbackName));
+}
+
+function resolveOptionalPath(workingDirectory: string, path: string): string {
+  return isAbsolute(path) ? path : resolve(workingDirectory, path);
 }

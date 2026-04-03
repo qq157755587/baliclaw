@@ -35,7 +35,7 @@ describe("buildSystemPrompt Phase 2", () => {
     }
   });
 
-  it("silently skips missing SOUL and USER files", async () => {
+  it("silently skips missing SOUL files and keeps USER writable context", async () => {
     const workingDirectory = await mkdtemp(join(tmpdir(), "baliclaw-prompts-phase2-missing-"));
 
     try {
@@ -46,7 +46,7 @@ describe("buildSystemPrompt Phase 2", () => {
       });
 
       expect(prompt).not.toContain("=== SOUL.md ===");
-      expect(prompt).not.toContain("=== USER.md ===");
+      expect(prompt).toContain("=== USER.md ===");
       expect(prompt).toContain("=== AGENTS.md ===\nAgents");
     } finally {
       await rm(workingDirectory, { recursive: true, force: true });
@@ -70,16 +70,18 @@ describe("buildSystemPrompt Phase 2", () => {
     }
   });
 
-  it("falls back to the Phase 1 prompt when all Phase 2 files are missing and memory is disabled", async () => {
+  it("keeps USER context even when all Phase 2 files are otherwise missing", async () => {
     const workingDirectory = await mkdtemp(join(tmpdir(), "baliclaw-prompts-phase2-fallback-"));
 
     try {
-      await expect(
-        buildSystemPrompt({
-          workingDirectory,
-          memoryEnabled: false
-        })
-      ).resolves.toBe("You are the BaliClaw Phase 1 agent.");
+      const prompt = await buildSystemPrompt({
+        workingDirectory,
+        memoryEnabled: false
+      });
+
+      expect(prompt).toContain("You are the BaliClaw Phase 1 agent.");
+      expect(prompt).toContain("=== USER.md ===");
+      expect(prompt).not.toContain("=== PERSISTENT MEMORY ===");
     } finally {
       await rm(workingDirectory, { recursive: true, force: true });
     }

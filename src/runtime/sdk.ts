@@ -13,6 +13,7 @@ import { buildAgentDefinitions } from "./agents.js";
 import { getProjectMemoryFilePath, readMemory } from "./memory.js";
 import { buildSystemPrompt } from "./prompts.js";
 import { loadPromptOnlySkills } from "./skills.js";
+import { getToolPolicy } from "./tool-policy.js";
 
 export interface QueryRequest {
   prompt: string;
@@ -113,7 +114,18 @@ export async function queryAgent(
         ...(request.mcpServers ? { mcpServers: request.mcpServers } : {})
       })
     : undefined;
-  const toolPolicy = buildRequestToolPolicy(request);
+  const toolPolicy = getToolPolicy({
+    tools: {
+      availableTools: request.tools ?? ["Bash", "Read", "Write", "Edit"]
+    },
+    mcp: {
+      servers: request.mcpServers ?? {}
+    },
+    skills: {
+      sdkNative: request.sdkNativeSkills ?? false
+    },
+    agents: request.agents ?? {}
+  });
   const deterministicClaudeSessionId = toClaudeSessionUuid(request.sessionId);
 
   try {
@@ -182,7 +194,7 @@ function createSdkQueryOptions(params: {
   request: QueryRequest;
   systemPrompt: string;
   agentDefinitions?: Record<string, SdkAgentDefinition>;
-  toolPolicy: ReturnType<typeof buildRequestToolPolicy>;
+  toolPolicy: ReturnType<typeof getToolPolicy>;
   resumeSessionId?: string;
   deterministicClaudeSessionId: string;
 }): SdkQueryOptions {
@@ -224,33 +236,6 @@ function createSdkQueryOptions(params: {
 
   return options;
 }
-
-function buildRequestToolPolicy(request: QueryRequest): {
-  permissionMode: "bypassPermissions";
-  allowDangerouslySkipPermissions: true;
-  tools: string[];
-} {
-  const tools = [...(request.tools ?? ["Bash", "Read", "Write", "Edit"])];
-
-  for (const serverName of Object.keys(request.mcpServers ?? {})) {
-    tools.push(`mcp__${serverName}__*`);
-  }
-
-  if (request.sdkNativeSkills && !tools.includes("Skill")) {
-    tools.push("Skill");
-  }
-
-  if (request.agents && Object.keys(request.agents).length > 0 && !tools.includes("Agent")) {
-    tools.push("Agent");
-  }
-
-  return {
-    permissionMode: "bypassPermissions",
-    allowDangerouslySkipPermissions: true,
-    tools
-  };
-}
-
 async function executeSdkQuery(
   params: {
     prompt: string;

@@ -9,11 +9,14 @@ describe("buildSystemPrompt", () => {
     const workingDirectory = await mkdtemp(join(tmpdir(), "baliclaw-prompts-base-"));
 
     try {
-      await expect(
-        buildSystemPrompt({
-          workingDirectory
-        })
-      ).resolves.toBe("You are the BaliClaw Phase 1 agent.");
+      const prompt = await buildSystemPrompt({
+        workingDirectory
+      });
+
+      expect(prompt).toContain("You are the BaliClaw Phase 1 agent.");
+      expect(prompt).toContain("=== USER.md ===");
+      expect(prompt).toContain(`lives at ${join(workingDirectory, "USER.md")}`);
+      expect(prompt).toContain("## Current USER.md contents:\n(empty)");
     } finally {
       await rm(workingDirectory, { recursive: true, force: true });
     }
@@ -53,10 +56,11 @@ describe("buildSystemPrompt", () => {
           "=== SOUL.md ===\nAgent soul",
           [
             "=== USER.md ===",
-            "This file describes the user. Keep it updated when you learn durable preferences or context.",
-            "Use the Write or Edit tool to correct outdated information instead of appending duplicate notes.",
+            `This file describes the user and lives at ${join(workingDirectory, "USER.md")}. Keep it updated when you learn durable preferences or context.`,
+            "Use the Write or Edit tool to create or update this file, and correct outdated information instead of appending duplicate notes.",
             "Keep it concise and avoid sensitive information that does not improve future help.",
             "",
+            "## Current USER.md contents:",
             "User profile"
           ].join("\n"),
           "=== AGENTS.md ===\nRepository rules",
@@ -114,7 +118,12 @@ describe("buildSystemPrompt", () => {
         ]
       });
 
-      expect(prompt).toBe("You are the BaliClaw Phase 1 agent.");
+      expect(prompt).toContain("You are the BaliClaw Phase 1 agent.");
+      expect(prompt).toContain("=== USER.md ===");
+      expect(prompt).toContain("## Current USER.md contents:\n(empty)");
+      expect(prompt).not.toContain("=== AGENTS.md ===");
+      expect(prompt).not.toContain("=== SYSTEM PROMPT ===");
+      expect(prompt).not.toContain("=== SKILL:");
     } finally {
       await rm(workingDirectory, { recursive: true, force: true });
     }
@@ -154,6 +163,7 @@ describe("buildSystemPrompt", () => {
         userFile: customUserFile
       });
 
+      expect(prompt).toContain(`lives at ${customUserFile}`);
       expect(prompt).toContain("Configured user");
       expect(prompt).not.toContain("Default user");
     } finally {
@@ -176,6 +186,45 @@ describe("buildSystemPrompt", () => {
       expect(prompt).toContain("=== PERSISTENT MEMORY ===");
       expect(prompt).toContain("/tmp/.baliclaw/memory/projects/empty/MEMORY.md");
       expect(prompt).toContain("## Current memory contents:\n(empty)");
+    } finally {
+      await rm(workingDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("includes an empty USER section when USER.md does not exist yet", async () => {
+    const workingDirectory = await mkdtemp(join(tmpdir(), "baliclaw-prompts-user-empty-"));
+
+    try {
+      const prompt = await buildSystemPrompt({
+        workingDirectory
+      });
+
+      expect(prompt).toContain("=== USER.md ===");
+      expect(prompt).toContain(`lives at ${join(workingDirectory, "USER.md")}`);
+      expect(prompt).toContain("## Current USER.md contents:\n(empty)");
+    } finally {
+      await rm(workingDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves relative prompt file overrides against the working directory", async () => {
+    const workingDirectory = await mkdtemp(join(tmpdir(), "baliclaw-prompts-relative-"));
+
+    try {
+      await writeFile(join(workingDirectory, "custom-soul.md"), "Relative soul", "utf8");
+      await writeFile(join(workingDirectory, "custom-user.md"), "Relative user", "utf8");
+      await writeFile(join(workingDirectory, "custom-system.md"), "Relative system", "utf8");
+
+      const prompt = await buildSystemPrompt({
+        workingDirectory,
+        soulFile: "custom-soul.md",
+        userFile: "custom-user.md",
+        systemPromptFile: "custom-system.md"
+      });
+
+      expect(prompt).toContain("=== SOUL.md ===\nRelative soul");
+      expect(prompt).toContain("Relative user");
+      expect(prompt).toContain("=== SYSTEM PROMPT ===\nRelative system");
     } finally {
       await rm(workingDirectory, { recursive: true, force: true });
     }

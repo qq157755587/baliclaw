@@ -56,6 +56,32 @@ describe("getToolPolicy", () => {
     expect(policy.tools).toEqual(["Read", "mcp__github__*", "mcp__docs__*"]);
   });
 
+  it("does not duplicate MCP wildcards already present in the base allowlist", () => {
+    const policy = getToolPolicy({
+      tools: {
+        availableTools: ["Read", "mcp__github__*"]
+      },
+      mcp: {
+        servers: {
+          github: {
+            type: "stdio",
+            command: "npx",
+            args: [],
+            env: {}
+          }
+        }
+      },
+      skills: {
+        enabled: true,
+        directories: [],
+        sdkNative: false
+      },
+      agents: {}
+    });
+
+    expect(policy.tools).toEqual(["Read", "mcp__github__*"]);
+  });
+
   it("adds the Skill tool when sdkNative skills are enabled", () => {
     expect(
       getToolPolicy({
