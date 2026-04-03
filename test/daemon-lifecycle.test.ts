@@ -185,7 +185,9 @@ describe("bootstrap", () => {
               workingDirectory: "/tmp/runtime",
               model: "claude-sonnet",
               maxTurns: 6,
-              systemPromptFile: "/tmp/system.md"
+              systemPromptFile: "/tmp/system.md",
+              soulFile: "/tmp/soul.md",
+              userFile: "/tmp/user.md"
             },
             agents: {
               reviewer: {
@@ -195,10 +197,16 @@ describe("bootstrap", () => {
             },
             skills: {
               enabled: true,
-              directories: ["/tmp/skills"]
+              directories: ["/tmp/skills"],
+              sdkNative: false
             },
             tools: {
               availableTools: ["Read", "Write"]
+            },
+            memory: {
+              enabled: false,
+              globalEnabled: false,
+              maxLines: 42
             }
           })
         } as never
@@ -233,13 +241,18 @@ describe("bootstrap", () => {
           model: "claude-sonnet",
           maxTurns: 6,
           systemPromptFile: "/tmp/system.md",
+          soulFile: "/tmp/soul.md",
+          userFile: "/tmp/user.md",
           skillDirectories: ["/tmp/skills"],
+          sdkNativeSkills: false,
           agents: {
             reviewer: {
               description: "Review code",
               prompt: "You review code."
             }
           },
+          memoryEnabled: false,
+          memoryMaxLines: 42,
           tools: ["Read", "Write"]
         }
       );
@@ -366,7 +379,8 @@ describe("bootstrap", () => {
         },
         skills: {
           enabled: true,
-          directories: ["/tmp/skills-1"]
+          directories: ["/tmp/skills-1"],
+          sdkNative: true
         },
         tools: {
           availableTools: ["Read"]
@@ -391,7 +405,8 @@ describe("bootstrap", () => {
         },
         skills: {
           enabled: true,
-          directories: ["/tmp/skills-2"]
+          directories: ["/tmp/skills-2"],
+          sdkNative: true
         },
         tools: {
           availableTools: ["Bash", "Write"]
@@ -454,6 +469,9 @@ describe("bootstrap", () => {
           maxTurns: 4,
           systemPromptFile: "/tmp/system-1.md",
           skillDirectories: ["/tmp/skills-1"],
+          sdkNativeSkills: true,
+          memoryEnabled: true,
+          memoryMaxLines: 200,
           tools: ["Read"]
         }
       );
@@ -467,6 +485,9 @@ describe("bootstrap", () => {
           maxTurns: 9,
           systemPromptFile: "/tmp/system-2.md",
           skillDirectories: ["/tmp/skills-2"],
+          sdkNativeSkills: true,
+          memoryEnabled: true,
+          memoryMaxLines: 200,
           tools: ["Bash", "Write"]
         }
       );
@@ -605,6 +626,9 @@ describe("bootstrap", () => {
           cwd: "/tmp/shared-runtime",
           sessionId: "telegram:default:direct:41",
           skillDirectories: [],
+          sdkNativeSkills: true,
+          memoryEnabled: true,
+          memoryMaxLines: 200,
           tools: ["Bash", "Read", "Write", "Edit"]
         }
       );
@@ -615,6 +639,9 @@ describe("bootstrap", () => {
           cwd: "/tmp/shared-runtime",
           sessionId: "telegram:default:direct:42",
           skillDirectories: [],
+          sdkNativeSkills: true,
+          memoryEnabled: true,
+          memoryMaxLines: 200,
           tools: ["Bash", "Read", "Write", "Edit"]
         }
       );

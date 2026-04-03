@@ -13,11 +13,15 @@ export interface AgentRunOptions {
   model?: string;
   maxTurns?: number;
   systemPromptFile?: string;
+  soulFile?: string;
+  userFile?: string;
   skillDirectories?: string[];
   tools?: string[];
   mcpServers?: Record<string, SdkMcpServerConfig>;
   sdkNativeSkills?: boolean;
   agents?: Record<string, AgentDefinitionConfig>;
+  memoryEnabled?: boolean;
+  memoryMaxLines?: number;
 }
 
 export interface AgentServiceDependencies {

@@ -245,9 +245,16 @@ function buildAgentRunOptions(config: AppConfig, sessionId: string): Parameters<
   if (config.runtime.systemPromptFile) {
     options.systemPromptFile = config.runtime.systemPromptFile;
   }
+  if (config.runtime.soulFile) {
+    options.soulFile = config.runtime.soulFile;
+  }
+  if (config.runtime.userFile) {
+    options.userFile = config.runtime.userFile;
+  }
   if (config.skills.enabled) {
     options.skillDirectories = config.skills.directories;
   }
+  options.sdkNativeSkills = config.skills.sdkNative;
 
   if (Object.keys(config.mcp.servers).length > 0) {
     options.mcpServers = config.mcp.servers;
@@ -255,6 +262,8 @@ function buildAgentRunOptions(config: AppConfig, sessionId: string): Parameters<
   if (Object.keys(config.agents).length > 0) {
     options.agents = config.agents;
   }
+  options.memoryEnabled = config.memory.enabled;
+  options.memoryMaxLines = config.memory.maxLines;
 
   return options;
 }
