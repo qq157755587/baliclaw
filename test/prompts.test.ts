@@ -25,6 +25,7 @@ describe("buildSystemPrompt", () => {
 
     try {
       await writeFile(join(workingDirectory, "SOUL.md"), "Agent soul", "utf8");
+      await writeFile(join(workingDirectory, "USER.md"), "User profile", "utf8");
       await writeFile(join(workingDirectory, "AGENTS.md"), "Repository rules", "utf8");
       await writeFile(extraPromptFile, "Extra runtime instructions", "utf8");
 
@@ -47,6 +48,14 @@ describe("buildSystemPrompt", () => {
         [
           "You are the BaliClaw Phase 1 agent.",
           "=== SOUL.md ===\nAgent soul",
+          [
+            "=== USER.md ===",
+            "This file describes the user. Keep it updated when you learn durable preferences or context.",
+            "Use the Write or Edit tool to correct outdated information instead of appending duplicate notes.",
+            "Keep it concise and avoid sensitive information that does not improve future help.",
+            "",
+            "User profile"
+          ].join("\n"),
           "=== AGENTS.md ===\nRepository rules",
           "=== SYSTEM PROMPT ===\nExtra runtime instructions",
           "=== SKILL: foo ===\nSkill foo instructions",
@@ -100,6 +109,27 @@ describe("buildSystemPrompt", () => {
       expect(prompt).not.toContain("Default soul");
     } finally {
       await rm(customSoulFile, { force: true });
+      await rm(workingDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("uses the configured user file path before the working directory default", async () => {
+    const workingDirectory = await mkdtemp(join(tmpdir(), "baliclaw-prompts-user-"));
+    const customUserFile = join(tmpdir(), `baliclaw-custom-user-${Date.now()}.md`);
+
+    try {
+      await writeFile(join(workingDirectory, "USER.md"), "Default user", "utf8");
+      await writeFile(customUserFile, "Configured user", "utf8");
+
+      const prompt = await buildSystemPrompt({
+        workingDirectory,
+        userFile: customUserFile
+      });
+
+      expect(prompt).toContain("Configured user");
+      expect(prompt).not.toContain("Default user");
+    } finally {
+      await rm(customUserFile, { force: true });
       await rm(workingDirectory, { recursive: true, force: true });
     }
   });

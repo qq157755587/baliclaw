@@ -11,6 +11,7 @@ export interface PromptSkill {
 export interface BuildSystemPromptOptions {
   workingDirectory: string;
   soulFile?: string;
+  userFile?: string;
   systemPromptFile?: string;
   skillPrompts?: PromptSkill[];
 }
@@ -18,10 +19,14 @@ export interface BuildSystemPromptOptions {
 export async function buildSystemPrompt(options: BuildSystemPromptOptions): Promise<string> {
   const sections: string[] = [baseSystemPrompt];
   const soulContent = await readOptionalTextFile(options.soulFile ?? join(options.workingDirectory, "SOUL.md"));
+  const userContent = await readOptionalTextFile(options.userFile ?? join(options.workingDirectory, "USER.md"));
   const agentsContent = await readOptionalTextFile(join(options.workingDirectory, "AGENTS.md"));
 
   if (soulContent) {
     sections.push(renderSection("SOUL.md", soulContent));
+  }
+  if (userContent) {
+    sections.push(renderUserSection(userContent));
   }
 
   if (agentsContent) {
@@ -59,6 +64,17 @@ async function readOptionalTextFile(path: string): Promise<string | null> {
 
 function renderSection(title: string, content: string): string {
   return `=== ${title} ===\n${content.trim()}`;
+}
+
+function renderUserSection(content: string): string {
+  return [
+    "=== USER.md ===",
+    "This file describes the user. Keep it updated when you learn durable preferences or context.",
+    "Use the Write or Edit tool to correct outdated information instead of appending duplicate notes.",
+    "Keep it concise and avoid sensitive information that does not improve future help.",
+    "",
+    content.trim()
+  ].join("\n");
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
