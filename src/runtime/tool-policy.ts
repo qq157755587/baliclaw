@@ -13,3 +13,27 @@ export function getPhase1ToolPolicy(config?: Pick<AppConfig, "tools">): ToolPoli
     tools: [...(config?.tools.availableTools ?? defaultAvailableTools)]
   };
 }
+
+export function getToolPolicy(
+  config: Pick<AppConfig, "tools" | "mcp" | "skills" | "agents">
+): ToolPolicy {
+  const tools = [...config.tools.availableTools];
+
+  for (const serverName of Object.keys(config.mcp.servers)) {
+    tools.push(`mcp__${serverName}__*`);
+  }
+
+  if (config.skills.sdkNative && !tools.includes("Skill")) {
+    tools.push("Skill");
+  }
+
+  if (Object.keys(config.agents).length > 0 && !tools.includes("Agent")) {
+    tools.push("Agent");
+  }
+
+  return {
+    permissionMode: "bypassPermissions",
+    allowDangerouslySkipPermissions: true,
+    tools
+  };
+}
