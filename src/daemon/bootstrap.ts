@@ -252,6 +252,9 @@ function buildAgentRunOptions(config: AppConfig, sessionId: string): Parameters<
   if (Object.keys(config.mcp.servers).length > 0) {
     options.mcpServers = config.mcp.servers;
   }
+  if (Object.keys(config.agents).length > 0) {
+    options.agents = config.agents;
+  }
 
   return options;
 }

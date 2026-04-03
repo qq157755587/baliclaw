@@ -14,6 +14,7 @@ describe("queryAgent", () => {
         allowDangerouslySkipPermissions?: boolean;
         tools?: string[];
         settingSources?: string[];
+        agents?: Record<string, { description: string; prompt: string }>;
         systemPrompt?: {
           type: "preset";
           preset: "claude_code";
@@ -48,10 +49,22 @@ describe("queryAgent", () => {
         systemPromptFile: "/tmp/system.md",
         skillDirectories: ["/tmp/extra-skills"],
         tools: ["Read", "Bash"],
-        sdkNativeSkills: true
+        sdkNativeSkills: true,
+        agents: {
+          reviewer: {
+            description: "Review code",
+            prompt: "You review code."
+          }
+        }
       },
       {
         buildSystemPrompt: vi.fn().mockResolvedValue("assembled prompt"),
+        buildAgentDefinitions: vi.fn().mockResolvedValue({
+          reviewer: {
+            description: "Review code",
+            prompt: "You review code."
+          }
+        }),
         loadPromptOnlySkills: vi.fn().mockResolvedValue([
           {
             name: "alpha",
@@ -89,6 +102,12 @@ describe("queryAgent", () => {
         allowDangerouslySkipPermissions: true,
         tools: ["Read", "Bash"],
         settingSources: ["user", "project"],
+        agents: {
+          reviewer: {
+            description: "Review code",
+            prompt: "You review code."
+          }
+        },
         stderr: expect.any(Function),
         systemPrompt: {
           type: "preset",
@@ -127,6 +146,7 @@ describe("queryAgent", () => {
       },
       {
         buildSystemPrompt: vi.fn().mockResolvedValue("prompt"),
+        buildAgentDefinitions: vi.fn().mockResolvedValue(undefined),
         loadPromptOnlySkills: vi.fn().mockResolvedValue([]),
         query: query as never
       }

@@ -187,6 +187,12 @@ describe("bootstrap", () => {
               maxTurns: 6,
               systemPromptFile: "/tmp/system.md"
             },
+            agents: {
+              reviewer: {
+                description: "Review code",
+                prompt: "You review code."
+              }
+            },
             skills: {
               enabled: true,
               directories: ["/tmp/skills"]
@@ -228,6 +234,12 @@ describe("bootstrap", () => {
           maxTurns: 6,
           systemPromptFile: "/tmp/system.md",
           skillDirectories: ["/tmp/skills"],
+          agents: {
+            reviewer: {
+              description: "Review code",
+              prompt: "You review code."
+            }
+          },
           tools: ["Read", "Write"]
         }
       );

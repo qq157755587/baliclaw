@@ -1,5 +1,14 @@
 import { createHash } from "node:crypto";
-import { query as sdkQuery, type SDKMessage, type SDKResultError, type SDKResultSuccess, type McpServerConfig as SdkMcpServerConfig } from "@anthropic-ai/claude-agent-sdk";
+import {
+  query as sdkQuery,
+  type AgentDefinition as SdkAgentDefinition,
+  type SDKMessage,
+  type SDKResultError,
+  type SDKResultSuccess,
+  type McpServerConfig as SdkMcpServerConfig
+} from "@anthropic-ai/claude-agent-sdk";
+import type { AgentDefinitionConfig } from "../config/schema.js";
+import { buildAgentDefinitions } from "./agents.js";
 import { buildSystemPrompt } from "./prompts.js";
 import { loadPromptOnlySkills } from "./skills.js";
 import { getPhase1ToolPolicy } from "./tool-policy.js";
@@ -16,6 +25,7 @@ export interface QueryRequest {
   tools?: string[];
   mcpServers?: Record<string, SdkMcpServerConfig>;
   sdkNativeSkills?: boolean;
+  agents?: Record<string, AgentDefinitionConfig>;
 }
 
 export interface QueryUsage {
@@ -31,6 +41,7 @@ export interface QueryResult {
 
 export interface QueryAgentDependencies {
   buildSystemPrompt?: typeof buildSystemPrompt;
+  buildAgentDefinitions?: typeof buildAgentDefinitions;
   loadPromptOnlySkills?: typeof loadPromptOnlySkills;
   query?: typeof sdkQuery;
 }
@@ -40,6 +51,7 @@ export async function queryAgent(
   dependencies: QueryAgentDependencies = {}
 ): Promise<QueryResult> {
   const buildPrompt = dependencies.buildSystemPrompt ?? buildSystemPrompt;
+  const buildAgents = dependencies.buildAgentDefinitions ?? buildAgentDefinitions;
   const loadSkills = dependencies.loadPromptOnlySkills ?? loadPromptOnlySkills;
   const runQuery = dependencies.query ?? sdkQuery;
 
@@ -65,6 +77,13 @@ export async function queryAgent(
   }
 
   const systemPrompt = await buildPrompt(promptOptions);
+  const agentDefinitions = request.agents
+    ? await buildAgents({
+        workingDirectory: request.cwd,
+        agents: request.agents,
+        ...(request.mcpServers ? { mcpServers: request.mcpServers } : {})
+      })
+    : undefined;
   const toolPolicy = getPhase1ToolPolicy(
     request.tools
       ? {
@@ -83,6 +102,7 @@ export async function queryAgent(
         options: createSdkQueryOptions({
           request,
           systemPrompt,
+          ...(agentDefinitions ? { agentDefinitions } : {}),
           toolPolicy,
           deterministicClaudeSessionId,
           ...(request.resumeSessionId ? { resumeSessionId: request.resumeSessionId } : {})
@@ -101,6 +121,7 @@ export async function queryAgent(
         options: createSdkQueryOptions({
           request,
           systemPrompt,
+          ...(agentDefinitions ? { agentDefinitions } : {}),
           toolPolicy,
           resumeSessionId: deterministicClaudeSessionId,
           deterministicClaudeSessionId
@@ -127,6 +148,7 @@ interface SdkQueryOptions {
   tools: string[];
   mcpServers?: Record<string, SdkMcpServerConfig>;
   settingSources?: ["user", "project"];
+  agents?: Record<string, SdkAgentDefinition>;
   stderr: (data: string) => void;
   systemPrompt: {
     type: "preset";
@@ -138,6 +160,7 @@ interface SdkQueryOptions {
 function createSdkQueryOptions(params: {
   request: QueryRequest;
   systemPrompt: string;
+  agentDefinitions?: Record<string, SdkAgentDefinition>;
   toolPolicy: ReturnType<typeof getPhase1ToolPolicy>;
   resumeSessionId?: string;
   deterministicClaudeSessionId: string;
@@ -173,6 +196,9 @@ function createSdkQueryOptions(params: {
 
   if (params.request.sdkNativeSkills) {
     options.settingSources = ["user", "project"];
+  }
+  if (params.agentDefinitions && Object.keys(params.agentDefinitions).length > 0) {
+    options.agents = params.agentDefinitions;
   }
 
   return options;
