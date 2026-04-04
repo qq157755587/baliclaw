@@ -31,6 +31,12 @@ describe("ConfigService", () => {
       await expect(readFile(join(home, ".baliclaw", "workspace", "AGENTS.md"), "utf8")).resolves.toContain("BaliClaw Workspace Rules");
       await expect(readFile(join(home, ".baliclaw", "workspace", "SOUL.md"), "utf8")).resolves.toContain("BaliClaw Default Identity");
       await expect(readFile(join(home, ".baliclaw", "workspace", "USER.md"), "utf8")).resolves.toContain("About The User");
+      await expect(
+        readFile(join(home, ".baliclaw", "workspace", ".claude", "skills", "find-skills", "SKILL.md"), "utf8")
+      ).resolves.toContain("name: find-skills");
+      await expect(
+        readFile(join(home, ".baliclaw", "workspace", ".claude", "skills", "skill-creator", "SKILL.md"), "utf8")
+      ).resolves.toContain("name: skill-creator");
     } finally {
       await rm(home, { recursive: true, force: true });
     }
