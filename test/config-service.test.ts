@@ -31,6 +31,12 @@ describe("ConfigService", () => {
       await expect(readFile(join(home, ".baliclaw", "workspace", "AGENTS.md"), "utf8")).resolves.toContain("BaliClaw Workspace Rules");
       await expect(readFile(join(home, ".baliclaw", "workspace", "SOUL.md"), "utf8")).resolves.toContain("BaliClaw Default Identity");
       await expect(readFile(join(home, ".baliclaw", "workspace", "USER.md"), "utf8")).resolves.toContain("About The User");
+      await expect(
+        readFile(join(home, ".baliclaw", "workspace", ".claude", "skills", "find-skills", "SKILL.md"), "utf8")
+      ).resolves.toContain("name: find-skills");
+      await expect(
+        readFile(join(home, ".baliclaw", "workspace", ".claude", "skills", "skill-creator", "SKILL.md"), "utf8")
+      ).resolves.toContain("name: skill-creator");
     } finally {
       await rm(home, { recursive: true, force: true });
     }
@@ -68,6 +74,27 @@ describe("ConfigService", () => {
       expect(config.runtime.model).toBe("claude-sonnet");
       expect(config.runtime.maxTurns).toBe(12);
       expect(config.runtime.workingDirectory).toBe(join(home, ".baliclaw", "workspace"));
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("does not overwrite pre-existing starter skill directories", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-config-existing-skill-"));
+    const workspaceDirectory = join(home, ".baliclaw", "workspace");
+    const existingSkillDirectory = join(workspaceDirectory, ".claude", "skills", "find-skills");
+    const existingSkillFile = join(existingSkillDirectory, "SKILL.md");
+
+    try {
+      await mkdir(existingSkillDirectory, { recursive: true });
+      await writeFile(existingSkillFile, "custom find-skills content\n", "utf8");
+
+      await new ConfigService(getAppPaths(home)).load();
+
+      await expect(readFile(existingSkillFile, "utf8")).resolves.toBe("custom find-skills content\n");
+      await expect(
+        readFile(join(workspaceDirectory, ".claude", "skills", "skill-creator", "SKILL.md"), "utf8")
+      ).resolves.toContain("name: skill-creator");
     } finally {
       await rm(home, { recursive: true, force: true });
     }
