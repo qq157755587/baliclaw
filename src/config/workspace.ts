@@ -1,5 +1,5 @@
 import { mkdir, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type { AppPaths } from "./paths.js";
 
 export const defaultAgentsFileContents = `# AGENTS.md - BaliClaw Workspace Rules
@@ -226,22 +226,32 @@ export function getDefaultWorkspaceDirectory(paths: AppPaths): string {
   return paths.workspaceDir;
 }
 
-export async function ensureWorkspaceScaffold(workingDirectory: string): Promise<void> {
-  await mkdir(workingDirectory, { recursive: true });
-  const findSkillsDirectory = join(workingDirectory, ".claude", "skills", "find-skills");
-  const skillCreatorDirectory = join(workingDirectory, ".claude", "skills", "skill-creator");
+export async function ensureWorkspaceScaffold(paths: AppPaths): Promise<void> {
+  await mkdir(paths.workspaceDir, { recursive: true });
+  const findSkillsDirectory = join(paths.workspaceDir, ".claude", "skills", "find-skills");
+  const skillCreatorDirectory = join(paths.workspaceDir, ".claude", "skills", "skill-creator");
+  const globalClaudeSkillsDirectory = join(dirname(paths.rootDir), ".claude", "skills");
 
   await Promise.all([
-    writeDefaultFile(join(workingDirectory, "AGENTS.md"), defaultAgentsFileContents),
-    writeDefaultFile(join(workingDirectory, "SOUL.md"), defaultSoulFileContents),
-    writeDefaultFile(join(workingDirectory, "USER.md"), defaultUserFileContents),
-    writeDefaultSkill(findSkillsDirectory, defaultFindSkillsFileContents),
-    writeDefaultSkill(skillCreatorDirectory, defaultSkillCreatorFileContents)
+    writeDefaultFile(join(paths.workspaceDir, "AGENTS.md"), defaultAgentsFileContents),
+    writeDefaultFile(join(paths.workspaceDir, "SOUL.md"), defaultSoulFileContents),
+    writeDefaultFile(join(paths.workspaceDir, "USER.md"), defaultUserFileContents),
+    writeDefaultSkill(findSkillsDirectory, defaultFindSkillsFileContents, globalClaudeSkillsDirectory),
+    writeDefaultSkill(skillCreatorDirectory, defaultSkillCreatorFileContents, globalClaudeSkillsDirectory)
   ]);
 }
 
-async function writeDefaultSkill(skillDirectory: string, contents: string): Promise<void> {
-  if (await directoryExists(skillDirectory)) {
+async function writeDefaultSkill(
+  skillDirectory: string,
+  contents: string,
+  globalClaudeSkillsDirectory: string
+): Promise<void> {
+  if (await pathExists(skillDirectory)) {
+    return;
+  }
+
+  const globalSkillDirectory = join(globalClaudeSkillsDirectory, basename(skillDirectory));
+  if (await pathExists(globalSkillDirectory)) {
     return;
   }
 
@@ -262,10 +272,10 @@ async function writeDefaultFile(path: string, contents: string): Promise<void> {
   }
 }
 
-async function directoryExists(path: string): Promise<boolean> {
+async function pathExists(path: string): Promise<boolean> {
   try {
-    const result = await stat(path);
-    return result.isDirectory();
+    await stat(path);
+    return true;
   } catch (error) {
     if (isMissingPathError(error)) {
       return false;

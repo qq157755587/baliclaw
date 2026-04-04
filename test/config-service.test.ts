@@ -100,6 +100,40 @@ describe("ConfigService", () => {
     }
   });
 
+  it("skips scaffolding a starter skill when the user already has a same-name global Claude skill", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-config-global-skill-"));
+    const paths = getAppPaths(home);
+    const globalFindSkillsDirectory = join(home, ".claude", "skills", "find-skills");
+    const workspaceSkillFile = join(
+      home,
+      ".baliclaw",
+      "workspace",
+      ".claude",
+      "skills",
+      "find-skills",
+      "SKILL.md"
+    );
+
+    try {
+      await mkdir(globalFindSkillsDirectory, { recursive: true });
+      await writeFile(join(globalFindSkillsDirectory, "SKILL.md"), "global find-skills content\n", "utf8");
+
+      await new ConfigService(paths).load();
+
+      await expect(readFile(join(globalFindSkillsDirectory, "SKILL.md"), "utf8")).resolves.toBe(
+        "global find-skills content\n"
+      );
+      await expect(readFile(workspaceSkillFile, "utf8")).rejects.toMatchObject({
+        code: "ENOENT"
+      });
+      await expect(
+        readFile(join(home, ".baliclaw", "workspace", ".claude", "skills", "skill-creator", "SKILL.md"), "utf8")
+      ).resolves.toContain("name: skill-creator");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
   it("returns a structured error for unknown top-level fields", async () => {
     const home = await mkdtemp(join(tmpdir(), "baliclaw-config-unknown-"));
     const paths = getAppPaths(home);

@@ -16,7 +16,7 @@ export class ConfigService {
       if (isMissingFileError(error)) {
         const config = normalizeConfig({}, this.paths);
         await writeJson5File(this.paths.configFile, config);
-        await ensureWorkspaceScaffold(config.runtime.workingDirectory);
+        await ensureWorkspaceScaffold(this.paths);
         return config;
       }
 
