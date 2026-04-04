@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AppPaths } from "./paths.js";
 
@@ -228,13 +228,24 @@ export function getDefaultWorkspaceDirectory(paths: AppPaths): string {
 
 export async function ensureWorkspaceScaffold(workingDirectory: string): Promise<void> {
   await mkdir(workingDirectory, { recursive: true });
+  const findSkillsDirectory = join(workingDirectory, ".claude", "skills", "find-skills");
+  const skillCreatorDirectory = join(workingDirectory, ".claude", "skills", "skill-creator");
+
   await Promise.all([
     writeDefaultFile(join(workingDirectory, "AGENTS.md"), defaultAgentsFileContents),
     writeDefaultFile(join(workingDirectory, "SOUL.md"), defaultSoulFileContents),
     writeDefaultFile(join(workingDirectory, "USER.md"), defaultUserFileContents),
-    writeDefaultFile(join(workingDirectory, ".claude", "skills", "find-skills", "SKILL.md"), defaultFindSkillsFileContents),
-    writeDefaultFile(join(workingDirectory, ".claude", "skills", "skill-creator", "SKILL.md"), defaultSkillCreatorFileContents)
+    writeDefaultSkill(findSkillsDirectory, defaultFindSkillsFileContents),
+    writeDefaultSkill(skillCreatorDirectory, defaultSkillCreatorFileContents)
   ]);
+}
+
+async function writeDefaultSkill(skillDirectory: string, contents: string): Promise<void> {
+  if (await directoryExists(skillDirectory)) {
+    return;
+  }
+
+  await writeDefaultFile(join(skillDirectory, "SKILL.md"), contents);
 }
 
 async function writeDefaultFile(path: string, contents: string): Promise<void> {
@@ -251,6 +262,23 @@ async function writeDefaultFile(path: string, contents: string): Promise<void> {
   }
 }
 
+async function directoryExists(path: string): Promise<boolean> {
+  try {
+    const result = await stat(path);
+    return result.isDirectory();
+  } catch (error) {
+    if (isMissingPathError(error)) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
 function isExistingFileError(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === "object" && error !== null && "code" in error && error.code === "EEXIST";
+}
+
+function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
 }
