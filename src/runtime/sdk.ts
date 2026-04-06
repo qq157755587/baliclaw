@@ -299,14 +299,20 @@ async function executeSdkQuery(
       throw new Error(`Claude Agent SDK failed: ${reason}`);
     }
 
+    const estimatedInputTokens = estimateInputTokens(finalResult.usage);
+    const usage: QueryUsage = {
+      totalCostUsd: finalResult.total_cost_usd,
+      turns: finalResult.num_turns
+    };
+
+    if (estimatedInputTokens !== undefined) {
+      usage.estimatedInputTokens = estimatedInputTokens;
+    }
+
     return {
       text: finalResult.result,
       sessionId: finalResult.session_id,
-      usage: {
-        totalCostUsd: finalResult.total_cost_usd,
-        turns: finalResult.num_turns,
-        estimatedInputTokens: estimateInputTokens(finalResult.usage)
-      },
+      usage,
       compacting,
       ...(compaction ? { compaction } : {})
     };

@@ -5,7 +5,10 @@ import type { InboundMessage } from "../shared/types.js";
 import { buildTelegramDirectSessionId } from "../session/stable-key.js";
 import { getLogger } from "../shared/logger.js";
 import { queryAgent, type QueryRequest } from "./sdk.js";
-import { SessionContextStore } from "./session-context-store.js";
+import {
+  SessionContextStore,
+  type SessionContextSnapshot
+} from "./session-context-store.js";
 import { ClaudeSessionMapStore } from "./session-map-store.js";
 
 export interface AgentRunOptions {
@@ -161,13 +164,17 @@ export class AgentService {
   ): void {
     const previous = this.sessionContextStore.get(sessionId);
     const updatedAt = new Date().toISOString();
+    const estimatedInputTokens = result.compaction
+      ? undefined
+      : result.usage?.estimatedInputTokens ?? previous?.estimatedInputTokens;
     const snapshot: SessionContextSnapshot = {
-      estimatedInputTokens: result.compaction
-        ? undefined
-        : result.usage?.estimatedInputTokens ?? previous?.estimatedInputTokens,
       compacting: result.compacting ?? false,
       updatedAt
     };
+
+    if (estimatedInputTokens !== undefined) {
+      snapshot.estimatedInputTokens = estimatedInputTokens;
+    }
 
     if (result.compaction) {
       snapshot.lastCompaction = {
