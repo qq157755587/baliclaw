@@ -1,6 +1,6 @@
 {
   "name": "@zhaoyuanjie/baliclaw",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Local-first Telegram AI gateway built on Claude Agent SDK.",
   "type": "module",
   "license": "MIT",
@@ -17,6 +17,10 @@
     "pnpm": ">=10"
   },
   "packageManager": "pnpm@10.6.3",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
   "files": [
     "dist/",
     "README.md",
