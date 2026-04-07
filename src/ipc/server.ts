@@ -44,7 +44,7 @@ export class IpcServer {
     this.resolveStatus = options.getStatus ?? (() => ({
       ok: true,
       service: "baliclaw",
-      version: "0.3.0"
+      version: "0.4.0"
     }));
   }
 
