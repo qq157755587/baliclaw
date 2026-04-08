@@ -119,6 +119,7 @@ Vitest. Tests in `test/`, named after the unit (e.g., `stable-key.test.ts`). Cri
 
 ### Reference Templates
 
-- `docs/reference/AGENTS.default.md` — Default workspace operating rules for BaliClaw installs
-- `docs/reference/SOUL.default.md` — Default identity and tone template
-- `docs/reference/USER.default.md` — Default user-context template
+- `resources/AGENTS.default.md` — Default workspace operating rules for BaliClaw installs
+- `resources/SOUL.default.md` — Default identity and tone template
+- `resources/USER.default.md` — Default user-context template
+- `resources/TOOLS.default.md` — Default BaliClaw operations manual injected into new workspaces

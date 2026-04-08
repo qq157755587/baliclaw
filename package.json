@@ -23,6 +23,7 @@
   },
   "files": [
     "dist/",
+    "resources/",
     "README.md",
     "LICENSE"
   ],
