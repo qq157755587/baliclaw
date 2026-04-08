@@ -45,6 +45,13 @@ Keep these roles separate. Do not turn one file into a duplicate of another.
 - If work requires tools or file changes, do the work first, then reply with the result.
 - If blocked, explain the blocker plainly.
 
+## Scheduled Tasks
+
+- Users may ask in natural language to create, update, delete, list, or check scheduled tasks.
+- When that intent is clear, treat it as scheduled task management work rather than asking the user to edit config files manually.
+- Use the system's scheduled task management capability when available; do not modify scheduled task config files directly.
+- After creating or updating a scheduled task, report the final applied task details clearly.
+
 ## Working Style
 
 - Be accurate, direct, and useful.
@@ -170,6 +177,99 @@ Keep this file concise.
 Do not store secrets, credentials, or unnecessary sensitive personal information.
 `;
 
+export const defaultToolsFileContents = `# TOOLS.md - BaliClaw Operations Manual
+
+This file describes BaliClaw-specific commands and control-plane operations that are safe and expected to use from this workspace.
+
+Use this file as the practical operating manual for BaliClaw itself.
+
+## Core Rule
+
+- Prefer BaliClaw's daemon-managed control plane over direct edits to config, pairing, or scheduled task state files.
+- Do not edit BaliClaw state files directly when an equivalent CLI / IPC operation exists.
+
+## General CLI Entry Points
+
+- Use the installed \`baliclaw\` CLI for operational changes.
+- Prefer the CLI over hand-editing JSON5 state.
+
+Common examples:
+
+- \`baliclaw status\`
+- \`baliclaw config get\`
+- \`baliclaw config set runtime.model '"claude-sonnet"'\`
+- \`baliclaw pairing list\`
+- \`baliclaw scheduled-tasks list\`
+
+## Config Management
+
+Use CLI / IPC for config changes instead of editing \`~/.baliclaw/baliclaw.json5\` directly.
+
+Useful commands:
+
+- \`baliclaw config get\`
+- \`baliclaw config get <json-path>\`
+- \`baliclaw config set <json-path> <json5-value>\`
+
+Examples:
+
+- \`baliclaw config get runtime\`
+- \`baliclaw config set runtime.model '"claude-opus"'\`
+- \`baliclaw config set logging.level '"debug"'\`
+
+## Pairing Management
+
+Use pairing commands for allowlist workflows instead of editing pairing files directly.
+
+Useful commands:
+
+- \`baliclaw pairing list\`
+- \`baliclaw pairing pending\`
+- \`baliclaw pairing approve <senderId>\`
+- \`baliclaw pairing revoke <senderId>\`
+
+## Scheduled Task Management
+
+Manage scheduled tasks through the scheduled task control plane. Do not edit scheduled task config files directly.
+
+Useful commands:
+
+- \`baliclaw scheduled-tasks list\`
+- \`baliclaw scheduled-tasks status <taskId>\`
+- \`baliclaw scheduled-tasks create <taskId> '<task-json5>'\`
+- \`baliclaw scheduled-tasks update <taskId> '<task-json5>'\`
+- \`baliclaw scheduled-tasks delete <taskId>\`
+
+### Scheduled Task JSON5 Shape
+
+A scheduled task definition is a JSON5 object with:
+
+- \`schedule\`
+- \`prompt\`
+- \`telegram.conversationId\`
+- \`timeoutMinutes\`
+
+Supported schedule shapes:
+
+- \`{ kind: 'everyHours', intervalHours: <positive integer> }\`
+- \`{ kind: 'daily', time: 'HH:mm' }\`
+- \`{ kind: 'weekly', days: ['mon'|'tue'|'wed'|'thu'|'fri'|'sat'|'sun', ...], time: 'HH:mm' }\`
+
+### Scheduled Task Operating Rules
+
+- When the user asks to create or update a scheduled task, infer a stable \`taskId\` when needed and then use the scheduled task CLI/control plane.
+- Unless the user explicitly asks for another Telegram target, use the current conversationId from interaction context as \`telegram.conversationId\`.
+- If the user explicitly mentions another timezone, convert that requested time into the daemon machine's local timezone before writing the task schedule.
+- If the user does not specify a timeout, set \`timeoutMinutes: 30\`.
+- After creating or updating a task, report the final applied task details clearly.
+
+## Notes
+
+- BaliClaw scheduled tasks run as fresh Claude sessions.
+- Scheduled task schedule times are stored and executed in the daemon machine's local timezone.
+- Use existing project files for implementation details, but use BaliClaw CLI / IPC for BaliClaw state mutations whenever possible.
+`;
+
 export const defaultFindSkillsFileContents = `---
 name: find-skills
 description: Discover, evaluate, and suggest relevant Claude skills for the current task.
@@ -236,6 +336,7 @@ export async function ensureWorkspaceScaffold(paths: AppPaths): Promise<void> {
     writeDefaultFile(join(paths.workspaceDir, "AGENTS.md"), defaultAgentsFileContents),
     writeDefaultFile(join(paths.workspaceDir, "SOUL.md"), defaultSoulFileContents),
     writeDefaultFile(join(paths.workspaceDir, "USER.md"), defaultUserFileContents),
+    writeDefaultFile(join(paths.workspaceDir, "TOOLS.md"), defaultToolsFileContents),
     writeDefaultSkill(findSkillsDirectory, defaultFindSkillsFileContents, globalClaudeSkillsDirectory),
     writeDefaultSkill(skillCreatorDirectory, defaultSkillCreatorFileContents, globalClaudeSkillsDirectory)
   ]);

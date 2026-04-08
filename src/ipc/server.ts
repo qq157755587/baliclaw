@@ -3,16 +3,29 @@ import { mkdir, stat, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { Logger } from "pino";
 import { PairingService } from "../auth/pairing-service.js";
+import { ScheduledTaskConfigService } from "../config/scheduled-task-config.js";
 import { appConfigSchema } from "../config/schema.js";
 import { ConfigService } from "../config/service.js";
 import { getAppPaths, type AppPaths } from "../config/paths.js";
+import { ScheduledTaskManager } from "../daemon/scheduled-task-manager.js";
+import { ScheduledTaskStatusStore } from "../runtime/scheduled-task-status-store.js";
 import { getLogger } from "../shared/logger.js";
 import type { AppStatus } from "../shared/types.js";
 import { handleConfigGet, handleConfigSet } from "./handlers/config.js";
 import { handlePairingApprove, handlePairingList } from "./handlers/pairing.js";
+import {
+  handleScheduledTaskCreate,
+  handleScheduledTaskDelete,
+  handleScheduledTaskList,
+  handleScheduledTaskStatus,
+  handleScheduledTaskUpdate
+} from "./handlers/scheduled-tasks.js";
 import { handleStatus } from "./handlers/status.js";
 import {
   pairingApproveRequestSchema,
+  scheduledTaskCreateRequestSchema,
+  scheduledTaskDeleteRequestSchema,
+  scheduledTaskUpdateRequestSchema,
   type PingResponse,
   type IpcErrorResponse
 } from "./schema.js";
@@ -21,6 +34,7 @@ export interface IpcServerOptions {
   paths?: AppPaths;
   logger?: Logger;
   configService?: ConfigService;
+  scheduledTaskManager?: ScheduledTaskManager;
   pairingService?: PairingService;
   reloadConfig?: () => Promise<object>;
   getStatus?: () => Promise<AppStatus> | AppStatus;
@@ -30,6 +44,7 @@ export class IpcServer {
   private readonly paths: AppPaths;
   private readonly logger: Logger;
   private readonly configService: ConfigService;
+  private readonly scheduledTaskManager: ScheduledTaskManager;
   private readonly pairingService: PairingService;
   private readonly reloadConfig: (() => Promise<object>) | undefined;
   private readonly resolveStatus: () => Promise<AppStatus> | AppStatus;
@@ -39,6 +54,11 @@ export class IpcServer {
     this.paths = options.paths ?? getAppPaths();
     this.logger = options.logger ?? getLogger("ipc");
     this.configService = options.configService ?? new ConfigService(this.paths);
+    this.scheduledTaskManager = options.scheduledTaskManager ?? new ScheduledTaskManager(
+      new ScheduledTaskConfigService(this.paths),
+      new ScheduledTaskStatusStore(this.paths),
+      this.paths
+    );
     this.pairingService = options.pairingService ?? new PairingService();
     this.reloadConfig = options.reloadConfig;
     this.resolveStatus = options.getStatus ?? (() => ({
@@ -90,6 +110,11 @@ export class IpcServer {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => {
         if (error) {
+          if (isServerNotRunningError(error)) {
+            resolve();
+            return;
+          }
+
           reject(error);
           return;
         }
@@ -147,9 +172,73 @@ export class IpcServer {
         return;
       }
 
+      if (method === "GET" && url.pathname === "/v1/scheduled-tasks") {
+        this.writeJson(response, 200, {
+          tasks: await handleScheduledTaskList(this.scheduledTaskManager)
+        });
+        return;
+      }
+
+      if (method === "GET" && url.pathname === "/v1/scheduled-tasks/status") {
+        const taskId = url.searchParams.get("taskId")?.trim();
+        if (!taskId) {
+          this.writeJson(response, 400, {
+            ok: false,
+            error: {
+              code: "IPC_INVALID_REQUEST",
+              message: "taskId is required"
+            }
+          } satisfies IpcErrorResponse);
+          return;
+        }
+
+        this.writeJson(response, 200, {
+          taskId,
+          status: await handleScheduledTaskStatus(this.scheduledTaskManager, taskId)
+        });
+        return;
+      }
+
       if (method === "POST" && url.pathname === "/v1/config/set") {
         const body = appConfigSchema.parse(await this.readJsonBody(request));
         this.writeJson(response, 200, await handleConfigSet(this.configService, body, this.reloadConfig));
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/v1/scheduled-tasks/create") {
+        const body = scheduledTaskCreateRequestSchema.parse(await this.readJsonBody(request));
+        this.writeJson(response, 200, {
+          taskId: body.taskId,
+          task: await handleScheduledTaskCreate(
+            this.scheduledTaskManager,
+            body.taskId,
+            body.task,
+            this.reloadConfig
+          )
+        });
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/v1/scheduled-tasks/update") {
+        const body = scheduledTaskUpdateRequestSchema.parse(await this.readJsonBody(request));
+        this.writeJson(response, 200, {
+          taskId: body.taskId,
+          task: await handleScheduledTaskUpdate(
+            this.scheduledTaskManager,
+            body.taskId,
+            body.task,
+            this.reloadConfig
+          )
+        });
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/v1/scheduled-tasks/delete") {
+        const body = scheduledTaskDeleteRequestSchema.parse(await this.readJsonBody(request));
+        this.writeJson(response, 200, {
+          taskId: body.taskId,
+          deleted: await handleScheduledTaskDelete(this.scheduledTaskManager, body.taskId, this.reloadConfig)
+        });
         return;
       }
 
@@ -197,6 +286,13 @@ export class IpcServer {
     const raw = chunks.join("").trim();
     return raw.length === 0 ? {} : JSON.parse(raw);
   }
+}
+
+function isServerNotRunningError(error: unknown): error is NodeJS.ErrnoException {
+  return typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === "ERR_SERVER_NOT_RUNNING";
 }
 
 async function cleanupStaleSocket(path: string): Promise<void> {

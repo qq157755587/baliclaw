@@ -97,6 +97,10 @@ describe("appConfigSchema Phase 2", () => {
       maxLines: 200
     });
     expect(config.runtime.loadFilesystemSettings).toBe(true);
+    expect(config.scheduledTasks).toEqual({
+      enabled: false,
+      file: ""
+    });
   });
 
   it("fills all new sections when parsing an empty config", () => {
@@ -116,6 +120,24 @@ describe("appConfigSchema Phase 2", () => {
     expect(config.runtime.loadFilesystemSettings).toBe(true);
     expect(config.runtime.soulFile).toBeUndefined();
     expect(config.runtime.userFile).toBeUndefined();
+    expect(config.scheduledTasks).toEqual({
+      enabled: false,
+      file: ""
+    });
+  });
+
+  it("parses scheduled tasks config defaults and overrides", () => {
+    const config = appConfigSchema.parse({
+      scheduledTasks: {
+        enabled: true,
+        file: "/tmp/scheduled-tasks.json5"
+      }
+    });
+
+    expect(config.scheduledTasks).toEqual({
+      enabled: true,
+      file: "/tmp/scheduled-tasks.json5"
+    });
   });
 
   it("keeps a complete Phase 1 config valid", () => {

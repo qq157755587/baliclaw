@@ -4,6 +4,13 @@ import { Command } from "commander";
 import { runConfigGetCommand, runConfigSetCommand } from "./commands/config.js";
 import { runDaemonCommand } from "./commands/daemon.js";
 import { runPairingApproveCommand, runPairingListCommand } from "./commands/pairing.js";
+import {
+  runScheduledTaskCreateCommand,
+  runScheduledTaskDeleteCommand,
+  runScheduledTaskListCommand,
+  runScheduledTaskStatusCommand,
+  runScheduledTaskUpdateCommand
+} from "./commands/scheduled-tasks.js";
 import { runStatusCommand } from "./commands/status.js";
 import { runTuiCommand } from "./commands/tui.js";
 
@@ -69,6 +76,53 @@ pairingCommand
   .argument("<code>", "pairing code to approve")
   .action(async (channel: string, code: string) => {
     console.log(await runPairingApproveCommand(channel, code));
+  });
+
+const scheduledTasksCommand = program
+  .command("scheduled-tasks")
+  .description("Manage scheduled tasks through the daemon control plane");
+
+scheduledTasksCommand
+  .command("list")
+  .description("List scheduled tasks")
+  .action(async () => {
+    console.log(await runScheduledTaskListCommand());
+  });
+
+scheduledTasksCommand
+  .command("status")
+  .description("Show the latest status for one scheduled task")
+  .argument("<taskId>", "scheduled task id")
+  .action(async (taskId: string) => {
+    console.log(await runScheduledTaskStatusCommand(taskId));
+  });
+
+scheduledTasksCommand
+  .command("create")
+  .description("Create a scheduled task from inline JSON5 or a file")
+  .argument("<taskId>", "scheduled task id")
+  .argument("[task]", "inline JSON5 task payload")
+  .option("-f, --file <path>", "read the task payload from a file")
+  .action(async (taskId: string, task: string | undefined, options: { file?: string }) => {
+    console.log(await runScheduledTaskCreateCommand(taskId, task, options));
+  });
+
+scheduledTasksCommand
+  .command("update")
+  .description("Update a scheduled task from inline JSON5 or a file")
+  .argument("<taskId>", "scheduled task id")
+  .argument("[task]", "inline JSON5 task payload")
+  .option("-f, --file <path>", "read the task payload from a file")
+  .action(async (taskId: string, task: string | undefined, options: { file?: string }) => {
+    console.log(await runScheduledTaskUpdateCommand(taskId, task, options));
+  });
+
+scheduledTasksCommand
+  .command("delete")
+  .description("Delete a scheduled task")
+  .argument("<taskId>", "scheduled task id")
+  .action(async (taskId: string) => {
+    console.log(await runScheduledTaskDeleteCommand(taskId));
   });
 
 const daemonCommand = program

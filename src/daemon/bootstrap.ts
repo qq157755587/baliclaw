@@ -3,8 +3,9 @@ import type { Logger } from "pino";
 import { ConfigService } from "../config/service.js";
 import { ensureStateDirectories, getAppPaths, type AppPaths } from "../config/paths.js";
 import type { AppConfig } from "../config/schema.js";
+import { ScheduledTaskConfigService } from "../config/scheduled-task-config.js";
 import { IpcServer } from "../ipc/server.js";
-import { AgentService } from "../runtime/agent-service.js";
+import { AgentService, type ScheduledAgentRunOptions } from "../runtime/agent-service.js";
 import { buildTelegramDirectSessionId } from "../session/stable-key.js";
 import { SessionService } from "../session/service.js";
 import {
@@ -16,6 +17,7 @@ import {
 import { TelegramService, type TelegramPollingBot } from "../telegram/service.js";
 import { getLogger } from "../shared/logger.js";
 import { ReloadService } from "./reload-service.js";
+import { ScheduledTaskRunError, ScheduledTaskService } from "./scheduled-task-service.js";
 import { createShutdownController, type ShutdownController } from "./shutdown.js";
 
 export interface BootstrapContext {
@@ -28,6 +30,7 @@ export interface BootstrapContext {
   sessionService: SessionService;
   agentService: AgentService;
   telegramService: TelegramService;
+  scheduledTaskService: ScheduledTaskService;
   reloadService: ReloadService;
   shutdownController: ShutdownController;
 }
@@ -41,6 +44,7 @@ export interface BootstrapOptions {
   pairingService?: PairingService;
   sessionService?: SessionService;
   agentService?: AgentService;
+  scheduledTaskService?: ScheduledTaskService;
   reloadService?: ReloadService;
   sendText?: (target: Parameters<typeof sendTelegramText>[0], text: string) => Promise<void>;
   createTypingHeartbeat?: (
@@ -67,6 +71,9 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   const agentLogger = getLogger("agent", {
     level: currentConfig.logging.level
   });
+  const scheduledTaskLogger = getLogger("scheduled-tasks", {
+    level: currentConfig.logging.level
+  });
   const telegramLogger = getLogger("telegram", {
     level: currentConfig.logging.level
   });
@@ -76,6 +83,7 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     logger: agentLogger
   });
   let activeTelegramService = options.telegramService ?? new TelegramService();
+  let activeScheduledTaskService = options.scheduledTaskService ?? new ScheduledTaskService();
   const shutdownController = createShutdownController(logger);
   const sendText = options.sendText ?? (async (target, text) => {
     await sendTelegramText(target, text, createTelegramApi(currentConfig.channels.telegram.botToken));
@@ -173,6 +181,70 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     return new TelegramService(telegramServiceOptions);
   };
 
+  const createConfiguredScheduledTaskService = (config: AppConfig): ScheduledTaskService =>
+    new ScheduledTaskService({
+      paths,
+      logger: scheduledTaskLogger,
+      configService: new ScheduledTaskConfigService(paths, config.scheduledTasks.file),
+      onTrigger: async ({ taskId, task, scheduledAt }) => {
+        const deliveryTarget = {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: task.telegram.conversationId
+        } as const;
+        const abortController = new AbortController();
+        const timeoutMs = task.timeoutMinutes * 60 * 1000;
+        const timeoutHandle = setTimeout(() => {
+          abortController.abort();
+        }, timeoutMs);
+        timeoutHandle.unref?.();
+
+        try {
+          const result = await agentService.runPrompt(task.prompt, {
+          ...buildAgentRunOptions(currentConfig, `scheduled:${taskId}:${scheduledAt}`),
+          abortController
+        });
+
+          if (result.autoCompacted) {
+            const notice = typeof result.autoCompactionPreTokens === "number"
+              ? `Scheduled task ${taskId} auto-compacted at about ${result.autoCompactionPreTokens} tokens so the run could continue.`
+              : `Scheduled task ${taskId} auto-compacted so the run could continue.`;
+            await sendText(deliveryTarget, notice);
+          }
+          if (result.todoNotice) {
+            await sendText(deliveryTarget, result.todoNotice);
+          }
+          if (result.text.trim().length > 0) {
+            await sendText(deliveryTarget, result.text);
+          }
+        } catch (error) {
+          if (abortController.signal.aborted) {
+            const message = `Scheduled task ${taskId} timed out after ${task.timeoutMinutes} minute(s) and was stopped.`;
+            await sendText(deliveryTarget, message);
+            throw new ScheduledTaskRunError("timed_out", message, "timeout reached");
+          }
+
+          const reason = error instanceof Error ? error.message : String(error);
+          await sendText(deliveryTarget, `Scheduled task ${taskId} failed: ${reason}`);
+          throw new ScheduledTaskRunError("failed", `Scheduled task ${taskId} failed`, reason);
+        } finally {
+          clearTimeout(timeoutHandle);
+        }
+      },
+      onSkip: async ({ taskId, task, scheduledAt, reason }) => {
+        await sendText(
+          {
+            channel: "telegram",
+            accountId: "default",
+            chatType: "direct",
+            conversationId: task.telegram.conversationId
+          },
+          `Scheduled task ${taskId} was skipped for the run scheduled at ${scheduledAt}: ${reason}.`
+        );
+      }
+    });
+
   const reconcileTelegramService = async (nextConfig: AppConfig, previousConfig: AppConfig): Promise<void> => {
     const telegramChanged = nextConfig.channels.telegram.enabled !== previousConfig.channels.telegram.enabled
       || nextConfig.channels.telegram.botToken !== previousConfig.channels.telegram.botToken;
@@ -202,20 +274,55 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     }
   };
 
+  const reconcileScheduledTaskService = async (nextConfig: AppConfig, previousConfig: AppConfig): Promise<void> => {
+    const scheduledTasksChanged =
+      nextConfig.scheduledTasks.enabled !== previousConfig.scheduledTasks.enabled ||
+      nextConfig.scheduledTasks.file !== previousConfig.scheduledTasks.file;
+
+    if (!scheduledTasksChanged) {
+      return;
+    }
+
+    if (previousConfig.scheduledTasks.enabled) {
+      await activeScheduledTaskService.stop();
+    }
+
+    if (options.scheduledTaskService) {
+      activeScheduledTaskService = options.scheduledTaskService;
+      if (nextConfig.scheduledTasks.enabled) {
+        await activeScheduledTaskService.start();
+      }
+      return;
+    }
+
+    activeScheduledTaskService = nextConfig.scheduledTasks.enabled
+      ? createConfiguredScheduledTaskService(nextConfig)
+      : new ScheduledTaskService({
+          paths,
+          logger: scheduledTaskLogger
+        });
+
+    if (nextConfig.scheduledTasks.enabled) {
+      await activeScheduledTaskService.start();
+    }
+  };
+
   const reloadService = options.reloadService ?? new ReloadService({
     paths,
     configService,
     logger: configLogger,
     initialConfig: currentConfig,
     applyConfig: async (nextConfig, previousConfig) => {
+      currentConfig = nextConfig;
       logger.level = nextConfig.logging.level;
       ipcLogger.level = nextConfig.logging.level;
       configLogger.level = nextConfig.logging.level;
       agentLogger.level = nextConfig.logging.level;
+      scheduledTaskLogger.level = nextConfig.logging.level;
       telegramLogger.level = nextConfig.logging.level;
 
       await reconcileTelegramService(nextConfig, previousConfig);
-      currentConfig = nextConfig;
+      await reconcileScheduledTaskService(nextConfig, previousConfig);
     }
   });
   const ipcServer = options.ipcServer ?? new IpcServer({
@@ -242,9 +349,18 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     await activeTelegramService.start();
   }
 
+  if (currentConfig.scheduledTasks.enabled) {
+    activeScheduledTaskService = options.scheduledTaskService ?? createConfiguredScheduledTaskService(currentConfig);
+    await activeScheduledTaskService.start();
+  }
+
   shutdownController.add({
     name: "telegram",
     close: async () => activeTelegramService.stop()
+  });
+  shutdownController.add({
+    name: "scheduled-tasks",
+    close: async () => activeScheduledTaskService.stop()
   });
 
   shutdownController.add({
@@ -264,13 +380,14 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     sessionService,
     agentService,
     telegramService: activeTelegramService,
+    scheduledTaskService: activeScheduledTaskService,
     reloadService,
     shutdownController
   };
 }
 
-function buildAgentRunOptions(config: AppConfig, sessionId: string): Parameters<AgentService["handleMessage"]>[1] {
-  const options: Exclude<Parameters<AgentService["handleMessage"]>[1], string> = {
+function buildAgentRunOptions(config: AppConfig, sessionId: string): ScheduledAgentRunOptions {
+  const options: ScheduledAgentRunOptions = {
     cwd: config.runtime.workingDirectory,
     sessionId,
     tools: config.tools.availableTools

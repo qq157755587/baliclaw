@@ -61,6 +61,10 @@ const defaultConfig: AppConfig = {
   logging: {
     level: "info"
   },
+  scheduledTasks: {
+    enabled: false,
+    file: ""
+  },
   mcp: {
     servers: {}
   },
@@ -849,6 +853,15 @@ describe("bootstrap", () => {
     const configService = {
       load: vi.fn<() => Promise<AppConfig>>().mockImplementation(async () => loadedConfigs.shift() ?? defaultConfig)
     } as never;
+    let context: Awaited<ReturnType<typeof bootstrap>> | null = null;
+    const waitForRunPromptCalls = async (count: number): Promise<void> => {
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        if (agentService.runPrompt.mock.calls.length >= count) {
+          return;
+        }
+        await Promise.resolve();
+      }
+    };
 
     try {
       const context = await bootstrap({

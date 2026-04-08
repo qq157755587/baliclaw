@@ -18,7 +18,7 @@ const mcpServerStdioSchema = z.object({
 
 const mcpServerHttpSchema = z.object({
   type: z.enum(["http", "sse"]),
-  url: z.string().url(),
+  url: z.url(),
   headers: z.record(z.string(), z.string()).default({})
 }).strict();
 
@@ -79,6 +79,11 @@ const loggingConfigSchema = z.object({
   level: z.enum(["debug", "info", "warn", "error"]).default("info")
 }).strict();
 
+const scheduledTasksConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  file: z.string().default("")
+}).strict();
+
 const memoryConfigSchema = z.object({
   enabled: z.boolean().default(true),
   globalEnabled: z.boolean().default(false),
@@ -91,6 +96,7 @@ export const appConfigSchema = z.object({
   tools: withObjectDefaults(toolsConfigSchema),
   skills: withObjectDefaults(skillsConfigSchema),
   logging: withObjectDefaults(loggingConfigSchema),
+  scheduledTasks: withObjectDefaults(scheduledTasksConfigSchema),
   mcp: withObjectDefaults(mcpConfigSchema),
   agents: z.record(z.string(), agentDefinitionSchema).default({}),
   memory: withObjectDefaults(memoryConfigSchema)
@@ -108,6 +114,9 @@ export type AppConfig = z.infer<typeof appConfigSchema>;
 
 export function getDefaultConfig(paths: AppPaths = getAppPaths()): AppConfig {
   return appConfigSchema.parse({
+    scheduledTasks: {
+      file: paths.scheduledTasksFile
+    },
     runtime: {
       workingDirectory: getDefaultWorkspaceDirectory(paths)
     }

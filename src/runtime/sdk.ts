@@ -22,6 +22,8 @@ export interface QueryRequest {
   prompt: string;
   sessionId: string;
   cwd: string;
+  abortController?: AbortController;
+  interactionContext?: string;
   resumeSessionId?: string;
   model?: string;
   maxTurns?: number;
@@ -94,6 +96,7 @@ export async function queryAgent(
 
   const promptOptions: {
     workingDirectory: string;
+    interactionContext?: string;
     soulFile?: string;
     userFile?: string;
     systemPromptFile?: string;
@@ -105,6 +108,9 @@ export async function queryAgent(
     workingDirectory: request.cwd,
     skillPrompts
   };
+  if (request.interactionContext) {
+    promptOptions.interactionContext = request.interactionContext;
+  }
   if (request.soulFile) {
     promptOptions.soulFile = request.soulFile;
   }
@@ -202,6 +208,7 @@ function isSdkCompactBoundaryMessage(message: SDKMessage): message is SDKCompact
 interface SdkQueryOptions {
   cwd: string;
   env: Record<string, string | undefined>;
+  abortController?: AbortController;
   model?: string;
   maxTurns: number;
   sessionId?: string;
@@ -241,6 +248,10 @@ function createSdkQueryOptions(params: {
       append: params.systemPrompt
     }
   };
+
+  if (params.request.abortController) {
+    options.abortController = params.request.abortController;
+  }
 
   if (params.toolPolicy.allowDangerouslySkipPermissions) {
     options.allowDangerouslySkipPermissions = true;

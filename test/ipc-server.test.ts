@@ -182,6 +182,119 @@ describe("IpcServer", () => {
     }
   });
 
+  it("serves scheduled task management routes over the configured unix socket", async () => {
+    const home = await mkdtemp(join(tmpdir(), "bc-ipc-st-"));
+    const paths = getAppPaths(home);
+    const task = {
+      schedule: {
+        kind: "daily" as const,
+        time: "09:00"
+      },
+      prompt: "Summarize",
+      telegram: {
+        conversationId: "42"
+      },
+      timeoutMinutes: 30
+    };
+    const server = new IpcServer({
+      paths,
+      scheduledTaskManager: {
+        listTasks: async () => ({
+          dailySummary: task
+        }),
+        createTask: async () => task,
+        updateTask: async () => ({
+          ...task,
+          timeoutMinutes: 45
+        }),
+        deleteTask: async () => true,
+        getTaskStatus: async () => ({
+          status: "succeeded",
+          finishedAt: "2026-04-08T00:00:00.000Z"
+        })
+      } as never
+    });
+
+    try {
+      await server.start();
+
+      await expect(requestJson(paths.socketFile, "/v1/scheduled-tasks")).resolves.toEqual({
+        statusCode: 200,
+        body: {
+          tasks: {
+            dailySummary: task
+          }
+        }
+      });
+
+      await expect(
+        requestJson(paths.socketFile, "/v1/scheduled-tasks/create", {
+          method: "POST",
+          body: {
+            taskId: "dailySummary",
+            task
+          }
+        })
+      ).resolves.toEqual({
+        statusCode: 200,
+        body: {
+          taskId: "dailySummary",
+          task
+        }
+      });
+
+      await expect(
+        requestJson(paths.socketFile, "/v1/scheduled-tasks/update", {
+          method: "POST",
+          body: {
+            taskId: "dailySummary",
+            task
+          }
+        })
+      ).resolves.toEqual({
+        statusCode: 200,
+        body: {
+          taskId: "dailySummary",
+          task: {
+            ...task,
+            timeoutMinutes: 45
+          }
+        }
+      });
+
+      await expect(
+        requestJson(paths.socketFile, "/v1/scheduled-tasks/delete", {
+          method: "POST",
+          body: {
+            taskId: "dailySummary"
+          }
+        })
+      ).resolves.toEqual({
+        statusCode: 200,
+        body: {
+          taskId: "dailySummary",
+          deleted: true
+        }
+      });
+
+      await expect(
+        requestJson(paths.socketFile, "/v1/scheduled-tasks/status?taskId=dailySummary")
+      ).resolves.toEqual({
+        statusCode: 200,
+        body: {
+          taskId: "dailySummary",
+          status: {
+            status: "succeeded",
+            finishedAt: "2026-04-08T00:00:00.000Z"
+          }
+        }
+      });
+    } finally {
+      await server.stop();
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
   it("removes the socket file when the server stops", async () => {
     const home = await mkdtemp(join(tmpdir(), "baliclaw-ipc-stale-"));
     const paths = getAppPaths(home);

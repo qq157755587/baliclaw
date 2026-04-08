@@ -26,6 +26,10 @@ const config: AppConfig = {
   logging: {
     level: "info"
   },
+  scheduledTasks: {
+    enabled: false,
+    file: ""
+  },
   mcp: {
     servers: {}
   },
@@ -78,6 +82,10 @@ describe("CLI config commands", () => {
       logging: {
         level: "warn"
       },
+      scheduledTasks: {
+        enabled: false,
+        file: ""
+      },
       mcp: {
         servers: {}
       },
@@ -127,6 +135,10 @@ describe("CLI config commands", () => {
         },
         logging: {
           level: "debug"
+        },
+        scheduledTasks: {
+          enabled: false,
+          file: ""
         },
         mcp: {
           servers: {}

@@ -36,7 +36,8 @@ describe("AgentService", () => {
     expect(queryAgent).toHaveBeenCalledWith({
       prompt: "hello",
       sessionId: "telegram:default:direct:42",
-      cwd: "/tmp/project"
+      cwd: "/tmp/project",
+      interactionContext: expect.stringContaining("conversationId: 42")
     });
     expect(sessionMapStore.set).toHaveBeenCalledWith(
       "telegram:default:direct:42",
@@ -85,6 +86,7 @@ describe("AgentService", () => {
       sessionId: "custom-session",
       resumeSessionId: "claude-session-existing",
       cwd: "/tmp/project",
+      interactionContext: expect.stringContaining("daemonTimezone:"),
       model: "claude-sonnet",
       maxTurns: 12,
       systemPromptFile: "/tmp/system.md",
@@ -236,7 +238,8 @@ describe("AgentService", () => {
       prompt: "hello",
       sessionId: "telegram:default:direct:42",
       resumeSessionId: "claude-session-existing",
-      cwd: "/tmp/project"
+      cwd: "/tmp/project",
+      interactionContext: expect.stringContaining("conversationId: 42")
     });
   });
 
@@ -374,6 +377,7 @@ describe("AgentService", () => {
       sessionId: "telegram:default:direct:42",
       resumeSessionId: "claude-session-existing",
       cwd: "/tmp/project",
+      interactionContext: expect.stringContaining("conversationId: 42"),
       maxTurns: 1
     });
   });

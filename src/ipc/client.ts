@@ -9,8 +9,15 @@ import {
   pairingApproveResponseSchema,
   pairingListResponseSchema,
   pingResponseSchema,
+  scheduledTaskCreateResponseSchema,
+  scheduledTaskDeleteResponseSchema,
+  scheduledTaskListResponseSchema,
+  scheduledTaskStatusResponseSchema,
+  scheduledTaskUpdateResponseSchema,
   statusResponseSchema
 } from "./schema.js";
+import type { ScheduledTaskDefinitionConfig } from "../config/scheduled-task-config.js";
+import type { ScheduledTaskStatusEntry } from "../runtime/scheduled-task-status-store.js";
 
 interface HttpJsonResponse {
   body: unknown;
@@ -86,6 +93,56 @@ export class IpcClient {
     );
 
     return response.approved;
+  }
+
+  async listScheduledTasks(): Promise<Record<string, ScheduledTaskDefinitionConfig>> {
+    const response = await this.performRequest("/v1/scheduled-tasks", scheduledTaskListResponseSchema, {
+      invalidMessage: "Invalid IPC scheduled task list response"
+    });
+
+    return response.tasks;
+  }
+
+  async createScheduledTask(taskId: string, task: ScheduledTaskDefinitionConfig): Promise<ScheduledTaskDefinitionConfig> {
+    const response = await this.performRequest("/v1/scheduled-tasks/create", scheduledTaskCreateResponseSchema, {
+      invalidMessage: "Invalid IPC scheduled task create response",
+      method: "POST",
+      body: { taskId, task }
+    });
+
+    return response.task;
+  }
+
+  async updateScheduledTask(taskId: string, task: ScheduledTaskDefinitionConfig): Promise<ScheduledTaskDefinitionConfig> {
+    const response = await this.performRequest("/v1/scheduled-tasks/update", scheduledTaskUpdateResponseSchema, {
+      invalidMessage: "Invalid IPC scheduled task update response",
+      method: "POST",
+      body: { taskId, task }
+    });
+
+    return response.task;
+  }
+
+  async deleteScheduledTask(taskId: string): Promise<boolean> {
+    const response = await this.performRequest("/v1/scheduled-tasks/delete", scheduledTaskDeleteResponseSchema, {
+      invalidMessage: "Invalid IPC scheduled task delete response",
+      method: "POST",
+      body: { taskId }
+    });
+
+    return response.deleted;
+  }
+
+  async getScheduledTaskStatus(taskId: string): Promise<ScheduledTaskStatusEntry | undefined> {
+    const response = await this.performRequest(
+      `/v1/scheduled-tasks/status?taskId=${encodeURIComponent(taskId)}`,
+      scheduledTaskStatusResponseSchema,
+      {
+        invalidMessage: "Invalid IPC scheduled task status response"
+      }
+    );
+
+    return response.status;
   }
 
   private async performRequest<T>(

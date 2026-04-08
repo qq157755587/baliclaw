@@ -28,9 +28,14 @@ describe("ConfigService", () => {
       expect(config.logging).toEqual({
         level: "info"
       });
+      expect(config.scheduledTasks).toEqual({
+        enabled: false,
+        file: join(home, ".baliclaw", "scheduled-tasks.json5")
+      });
       await expect(readFile(join(home, ".baliclaw", "workspace", "AGENTS.md"), "utf8")).resolves.toContain("BaliClaw Workspace Rules");
       await expect(readFile(join(home, ".baliclaw", "workspace", "SOUL.md"), "utf8")).resolves.toContain("BaliClaw Default Identity");
       await expect(readFile(join(home, ".baliclaw", "workspace", "USER.md"), "utf8")).resolves.toContain("About The User");
+      await expect(readFile(join(home, ".baliclaw", "workspace", "TOOLS.md"), "utf8")).resolves.toContain("BaliClaw Operations Manual");
       await expect(
         readFile(join(home, ".baliclaw", "workspace", ".claude", "skills", "find-skills", "SKILL.md"), "utf8")
       ).resolves.toContain("name: find-skills");
@@ -229,6 +234,10 @@ describe("ConfigService", () => {
         },
         logging: {
           level: "warn"
+        },
+        scheduledTasks: {
+          enabled: true,
+          file: "/tmp/scheduled-tasks.json5"
         }
       });
 
@@ -241,6 +250,10 @@ describe("ConfigService", () => {
         },
         logging: {
           level: "warn"
+        },
+        scheduledTasks: {
+          enabled: true,
+          file: "/tmp/scheduled-tasks.json5"
         }
       });
     } finally {

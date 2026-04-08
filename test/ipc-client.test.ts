@@ -75,6 +75,10 @@ describe("IpcClient", () => {
       logging: {
         level: "info"
       },
+      scheduledTasks: {
+        enabled: false,
+        file: ""
+      },
       mcp: {
         servers: {}
       },
@@ -145,5 +149,95 @@ describe("IpcClient", () => {
 
     await expect(client.listPairingRequests("telegram")).resolves.toEqual([request]);
     await expect(client.approvePairingCode("telegram", "ABCD2345")).resolves.toEqual(request);
+  });
+
+  it("supports scheduled task management over the shared transport", async () => {
+    const task = {
+      schedule: {
+        kind: "daily" as const,
+        time: "09:00"
+      },
+      prompt: "Summarize",
+      telegram: {
+        conversationId: "42"
+      },
+      timeoutMinutes: 30
+    };
+    const client = new IpcClient({
+      requestJson: async (path, init) => {
+        if (path === "/v1/scheduled-tasks") {
+          return {
+            statusCode: 200,
+            body: {
+              tasks: {
+                dailySummary: task
+              }
+            }
+          };
+        }
+
+        if (path === "/v1/scheduled-tasks/create" && init?.method === "POST") {
+          return {
+            statusCode: 200,
+            body: {
+              taskId: "dailySummary",
+              task
+            }
+          };
+        }
+
+        if (path === "/v1/scheduled-tasks/update" && init?.method === "POST") {
+          return {
+            statusCode: 200,
+            body: {
+              taskId: "dailySummary",
+              task: {
+                ...task,
+                timeoutMinutes: 45
+              }
+            }
+          };
+        }
+
+        if (path === "/v1/scheduled-tasks/delete" && init?.method === "POST") {
+          return {
+            statusCode: 200,
+            body: {
+              taskId: "dailySummary",
+              deleted: true
+            }
+          };
+        }
+
+        if (path === "/v1/scheduled-tasks/status?taskId=dailySummary") {
+          return {
+            statusCode: 200,
+            body: {
+              taskId: "dailySummary",
+              status: {
+                status: "succeeded",
+                finishedAt: "2026-04-08T00:00:00.000Z"
+              }
+            }
+          };
+        }
+
+        throw new Error(`unexpected path: ${path}`);
+      }
+    });
+
+    await expect(client.listScheduledTasks()).resolves.toEqual({
+      dailySummary: task
+    });
+    await expect(client.createScheduledTask("dailySummary", task)).resolves.toEqual(task);
+    await expect(client.updateScheduledTask("dailySummary", task)).resolves.toEqual({
+      ...task,
+      timeoutMinutes: 45
+    });
+    await expect(client.deleteScheduledTask("dailySummary")).resolves.toBe(true);
+    await expect(client.getScheduledTaskStatus("dailySummary")).resolves.toEqual({
+      status: "succeeded",
+      finishedAt: "2026-04-08T00:00:00.000Z"
+    });
   });
 });

@@ -72,6 +72,7 @@ describe("queryAgent", () => {
         prompt: "hello",
         sessionId: "telegram:default:direct:42",
         cwd: "/tmp/project",
+        interactionContext: "conversationId: 42",
         maxTurns: 12,
         systemPromptFile: "/tmp/system.md",
         soulFile: "/tmp/soul.md",
@@ -174,6 +175,7 @@ describe("queryAgent", () => {
     });
     expect(buildSystemPrompt).toHaveBeenCalledWith({
       workingDirectory: "/tmp/project",
+      interactionContext: "conversationId: 42",
       soulFile: "/tmp/soul.md",
       userFile: "/tmp/user.md",
       systemPromptFile: "/tmp/system.md",

@@ -26,6 +26,10 @@ const baseConfig: AppConfig = {
   logging: {
     level: "info"
   },
+  scheduledTasks: {
+    enabled: false,
+    file: ""
+  },
   mcp: {
     servers: {
       docs: {

@@ -41,6 +41,13 @@ Keep these roles separate. Do not turn one file into a duplicate of another.
 - If work requires tools or file changes, do the work first, then reply with the result.
 - If blocked, explain the blocker plainly.
 
+## Scheduled Tasks
+
+- Users may ask in natural language to create, update, delete, list, or check scheduled tasks.
+- When that intent is clear, treat it as scheduled task management work rather than asking the user to edit config files manually.
+- Use the system's scheduled task management capability when available; do not modify scheduled task config files directly.
+- After creating or updating a scheduled task, report the final applied task details clearly.
+
 ## Working Style
 
 - Be accurate, direct, and useful.

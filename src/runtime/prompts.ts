@@ -10,6 +10,7 @@ export interface PromptSkill {
 
 export interface BuildSystemPromptOptions {
   workingDirectory: string;
+  interactionContext?: string;
   soulFile?: string;
   userFile?: string;
   systemPromptFile?: string;
@@ -26,6 +27,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions): Prom
   const soulContent = await readOptionalTextFile(soulFilePath);
   const userContent = await readOptionalTextFile(userFilePath);
   const agentsContent = await readOptionalTextFile(join(options.workingDirectory, "AGENTS.md"));
+  const toolsContent = await readOptionalTextFile(join(options.workingDirectory, "TOOLS.md"));
 
   if (soulContent) {
     sections.push(renderSection("SOUL.md", soulContent));
@@ -34,6 +36,13 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions): Prom
 
   if (agentsContent) {
     sections.push(renderSection("AGENTS.md", agentsContent));
+  }
+  if (toolsContent) {
+    sections.push(renderSection("TOOLS.md", toolsContent));
+  }
+
+  if (options.interactionContext?.trim()) {
+    sections.push(renderSection("INTERACTION CONTEXT", options.interactionContext));
   }
 
   if (options.systemPromptFile) {

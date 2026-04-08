@@ -30,6 +30,7 @@ describe("buildSystemPrompt", () => {
       await writeFile(join(workingDirectory, "SOUL.md"), "Agent soul", "utf8");
       await writeFile(join(workingDirectory, "USER.md"), "User profile", "utf8");
       await writeFile(join(workingDirectory, "AGENTS.md"), "Repository rules", "utf8");
+      await writeFile(join(workingDirectory, "TOOLS.md"), "Workspace tools", "utf8");
       await writeFile(extraPromptFile, "Extra runtime instructions", "utf8");
 
       const prompt = await buildSystemPrompt({
@@ -64,6 +65,7 @@ describe("buildSystemPrompt", () => {
             "User profile"
           ].join("\n"),
           "=== AGENTS.md ===\nRepository rules",
+          "=== TOOLS.md ===\nWorkspace tools",
           "=== SYSTEM PROMPT ===\nExtra runtime instructions",
           [
             "=== PERSISTENT MEMORY ===",
@@ -122,6 +124,7 @@ describe("buildSystemPrompt", () => {
       expect(prompt).toContain("=== USER.md ===");
       expect(prompt).toContain("## Current USER.md contents:\n(empty)");
       expect(prompt).not.toContain("=== AGENTS.md ===");
+      expect(prompt).not.toContain("=== TOOLS.md ===");
       expect(prompt).not.toContain("=== SYSTEM PROMPT ===");
       expect(prompt).not.toContain("=== SKILL:");
     } finally {
@@ -202,6 +205,22 @@ describe("buildSystemPrompt", () => {
       expect(prompt).toContain("=== USER.md ===");
       expect(prompt).toContain(`lives at ${join(workingDirectory, "USER.md")}`);
       expect(prompt).toContain("## Current USER.md contents:\n(empty)");
+    } finally {
+      await rm(workingDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("includes TOOLS.md when present", async () => {
+    const workingDirectory = await mkdtemp(join(tmpdir(), "baliclaw-prompts-tools-"));
+
+    try {
+      await writeFile(join(workingDirectory, "TOOLS.md"), "BaliClaw commands", "utf8");
+
+      const prompt = await buildSystemPrompt({
+        workingDirectory
+      });
+
+      expect(prompt).toContain("=== TOOLS.md ===\nBaliClaw commands");
     } finally {
       await rm(workingDirectory, { recursive: true, force: true });
     }

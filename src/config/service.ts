@@ -78,6 +78,10 @@ function normalizeConfig(config: Partial<AppConfig>, paths: AppPaths): AppConfig
       ...defaults.logging,
       ...config.logging
     },
+    scheduledTasks: {
+      ...defaults.scheduledTasks,
+      ...config.scheduledTasks
+    },
     mcp: {
       ...defaults.mcp,
       ...config.mcp,

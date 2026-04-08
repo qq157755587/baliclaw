@@ -5,13 +5,14 @@ import { describe, expect, it } from "vitest";
 import { buildSystemPrompt } from "../src/runtime/prompts.js";
 
 describe("buildSystemPrompt Phase 2", () => {
-  it("orders SOUL, USER, AGENTS, memory, and skills as documented", async () => {
+  it("orders SOUL, USER, AGENTS, TOOLS, memory, and skills as documented", async () => {
     const workingDirectory = await mkdtemp(join(tmpdir(), "baliclaw-prompts-phase2-order-"));
 
     try {
       await writeFile(join(workingDirectory, "SOUL.md"), "Soul", "utf8");
       await writeFile(join(workingDirectory, "USER.md"), "User", "utf8");
       await writeFile(join(workingDirectory, "AGENTS.md"), "Agents", "utf8");
+      await writeFile(join(workingDirectory, "TOOLS.md"), "Tools", "utf8");
 
       const prompt = await buildSystemPrompt({
         workingDirectory,
@@ -28,7 +29,8 @@ describe("buildSystemPrompt Phase 2", () => {
 
       expect(prompt.indexOf("=== SOUL.md ===")).toBeLessThan(prompt.indexOf("=== USER.md ==="));
       expect(prompt.indexOf("=== USER.md ===")).toBeLessThan(prompt.indexOf("=== AGENTS.md ==="));
-      expect(prompt.indexOf("=== AGENTS.md ===")).toBeLessThan(prompt.indexOf("=== PERSISTENT MEMORY ==="));
+      expect(prompt.indexOf("=== AGENTS.md ===")).toBeLessThan(prompt.indexOf("=== TOOLS.md ==="));
+      expect(prompt.indexOf("=== TOOLS.md ===")).toBeLessThan(prompt.indexOf("=== PERSISTENT MEMORY ==="));
       expect(prompt.indexOf("=== PERSISTENT MEMORY ===")).toBeLessThan(prompt.indexOf("=== SKILL: phase2 ==="));
     } finally {
       await rm(workingDirectory, { recursive: true, force: true });
@@ -48,6 +50,7 @@ describe("buildSystemPrompt Phase 2", () => {
       expect(prompt).not.toContain("=== SOUL.md ===");
       expect(prompt).toContain("=== USER.md ===");
       expect(prompt).toContain("=== AGENTS.md ===\nAgents");
+      expect(prompt).not.toContain("=== TOOLS.md ===");
     } finally {
       await rm(workingDirectory, { recursive: true, force: true });
     }
@@ -82,6 +85,23 @@ describe("buildSystemPrompt Phase 2", () => {
       expect(prompt).toContain("You are the BaliClaw Phase 1 agent.");
       expect(prompt).toContain("=== USER.md ===");
       expect(prompt).not.toContain("=== PERSISTENT MEMORY ===");
+    } finally {
+      await rm(workingDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("includes interaction context when provided", async () => {
+    const workingDirectory = await mkdtemp(join(tmpdir(), "baliclaw-prompts-phase2-context-"));
+
+    try {
+      const prompt = await buildSystemPrompt({
+        workingDirectory,
+        interactionContext: "conversationId: 42",
+        memoryEnabled: false
+      });
+
+      expect(prompt).toContain("=== INTERACTION CONTEXT ===");
+      expect(prompt).toContain("conversationId: 42");
     } finally {
       await rm(workingDirectory, { recursive: true, force: true });
     }

@@ -22,6 +22,10 @@ const initialConfig: AppConfig = {
   },
   logging: {
     level: "info"
+  },
+  scheduledTasks: {
+    enabled: false,
+    file: ""
   }
 };
 

@@ -23,6 +23,7 @@ pnpm test                 # Run Vitest suite
 pnpm test -- <pattern>    # Run focused tests (e.g., pnpm test -- stable-key)
 pnpm test:watch           # Vitest watch mode
 pnpm dev                  # Run CLI entrypoint via tsx
+pnpm dev -- scheduled-tasks list  # Inspect scheduled tasks through the CLI entrypoint
 ```
 
 Use `nvm use` before running built artifacts directly (`node dist/daemon/index.js`, `node dist/cli/index.js status`, etc.).
@@ -46,24 +47,41 @@ Telegram Update → TelegramService (polling)
   → TelegramService (reply delivery + typing heartbeat)
 ```
 
+### Scheduled Task Flow
+
+```
+User asks BaliClaw to create/update a scheduled task
+  → agent identifies scheduled task intent
+  → baliclaw CLI / IPC scheduled-tasks control plane
+  → daemon-native ScheduledTaskManager persists task definitions
+  → ScheduledTaskService loads tasks and schedules future runs
+  → each run executes as a fresh Claude session
+  → result / skip / failure is delivered back to Telegram
+```
+
 ### Key Modules
 
 - **`src/daemon/bootstrap.ts`** — Service composition and wiring. The central place where all services are created and connected.
+- **`src/daemon/scheduled-task-service.ts`** — Scheduler lifecycle, next-run timers, non-overlap enforcement, and task run orchestration.
+- **`src/daemon/scheduled-task-manager.ts`** — Daemon-native CRUD layer for scheduled task definitions and status lookups.
 - **`src/config/`** — Zod-validated JSON5 config (`~/.baliclaw/baliclaw.json5`). Phase 2 config covers MCP servers, SubAgents, memory, and runtime prompt files. All filesystem paths centralized in `paths.ts`.
+- **`src/config/scheduled-task-config.ts`** — External scheduled task file schema and load/save service.
 - **`src/ipc/`** — HTTP-over-Unix-socket control plane. All config/pairing mutations go through daemon IPC, never direct file writes from CLI.
+- **`src/ipc/handlers/scheduled-tasks.ts`** — IPC handlers for scheduled task list/create/update/delete/status operations.
 - **`src/telegram/`** — grammy-based polling, message normalization (`normalize.ts`), reply delivery with typing heartbeat (`send.ts`), Telegram-specific markdown formatting and chunking (`format.ts`).
 - **`src/auth/`** — Pairing workflow: unapproved users get an 8-char code, operator approves via CLI, sender added to allowlist.
 - **`src/session/`** — Deterministic session ID from Telegram user/chat, per-user turn queue for serialized processing.
 - **`src/runtime/sdk.ts`** — Claude Agent SDK integration. Builds SDK query options, injects prompt context, manages session continuity via `resumeSessionId`, and passes through MCP/Skills/SubAgents.
 - **`src/runtime/agent-service.ts`** — Runtime request assembly from daemon options into `queryAgent()`, plus user-facing error handling.
 - **`src/runtime/prompts.ts`** — System prompt composition for SOUL.md, USER.md, AGENTS.md, extra prompt files, MEMORY.md, and prompt-only skills.
+- **`src/runtime/scheduled-task-status-store.ts`** — Persistent latest-status storage for scheduled tasks.
 - **`src/runtime/agents.ts`** — SubAgent definition builder, including `promptFile` loading and MCP server reference resolution.
 - **`src/runtime/memory.ts`** — Project memory hash/path helpers and bounded MEMORY.md reads.
 - **`src/runtime/tool-policy.ts`** — Allowed tool policy merging for built-ins, MCP wildcards, SDK native `Skill`, and `Agent`.
 
 ### State Files (all under `~/.baliclaw/`, local-only)
 
-Config, Unix socket, pairing pending/allowlist JSONs, Claude session mappings, and project memory files under `memory/projects/<project-hash>/MEMORY.md`.
+Config, scheduled task definitions/status, Unix socket, pairing pending/allowlist JSONs, Claude session mappings, and project memory files under `memory/projects/<project-hash>/MEMORY.md`.
 
 ## Conventions
 
@@ -75,13 +93,16 @@ Config, Unix socket, pairing pending/allowlist JSONs, Claude session mappings, a
 - Proxy config stays at the Telegram transport boundary; don't leak proxy env vars to Claude child processes
 - Telegram typing is explicit `sendChatAction("typing")`, not SDK-driven
 - Config mutations always go through daemon IPC; CLI never writes config/pairing files directly
+- Scheduled task mutations also go through daemon IPC / scheduled task manager; do not edit the scheduled task file directly from agent logic
+- Scheduled task runs use fresh Claude sessions; they are independent agent executions, not continuations of the current chat session
+- Scheduled task schedule times are stored and executed in the daemon machine's local timezone
 - Phase 2 prompt files are file-system driven: `SOUL.md` and `USER.md` live in the working directory unless overridden; `MEMORY.md` lives under `~/.baliclaw/memory/projects/`
 - SDK-native capabilities are passthroughs, not reimplementations: prefer wiring config into SDK options over custom wrappers for MCP, Skills, or SubAgents
 - `tools.availableTools` remains the base allowlist; Phase 2 additions are merged in `runtime/tool-policy.ts`
 
 ## Testing
 
-Vitest. Tests in `test/`, named after the unit (e.g., `stable-key.test.ts`). Critical-path coverage includes: config validation, Phase 2 tool-policy merging, prompt assembly order, memory helpers, subagent definition building, IPC routes, pairing flow, stable session keys, turn serialization, Telegram formatting/chunking, and the authorized-sender-to-agent-reply path.
+Vitest. Tests in `test/`, named after the unit (e.g., `stable-key.test.ts`). Critical-path coverage includes: config validation, scheduled task schema/status/schedule logic, task manager IPC routes, Phase 2 tool-policy merging, prompt assembly order, memory helpers, subagent definition building, pairing flow, stable session keys, turn serialization, Telegram formatting/chunking, and the authorized-sender-to-agent-reply path.
 
 ## Reference Docs
 

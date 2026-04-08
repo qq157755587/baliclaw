@@ -4,6 +4,7 @@ export const appSubsystems = [
   "daemon",
   "ipc",
   "config",
+  "scheduled-tasks",
   "telegram",
   "pairing",
   "session",

@@ -15,6 +15,8 @@ import { ClaudeSessionMapStore } from "./session-map-store.js";
 export interface AgentRunOptions {
   cwd: string;
   sessionId?: string;
+  abortController?: AbortController;
+  interactionContext?: string;
   model?: string;
   maxTurns?: number;
   systemPromptFile?: string;
@@ -28,6 +30,9 @@ export interface AgentRunOptions {
   memoryEnabled?: boolean;
   memoryMaxLines?: number;
 }
+
+export type ScheduledAgentRunOptions = Required<Pick<AgentRunOptions, "cwd" | "sessionId">> &
+  Omit<AgentRunOptions, "cwd" | "sessionId">;
 
 export interface AgentServiceDependencies {
   logger?: Logger;
@@ -165,6 +170,36 @@ export class AgentService {
     }
   }
 
+  async runPrompt(
+    prompt: string,
+    options: ScheduledAgentRunOptions
+  ): Promise<AgentMessageResult> {
+    try {
+      const result = await this.runQueryAgent(createQueryRequest(prompt, options));
+      const todoNotice = result.todo ? this.buildTodoNotice(undefined, result.todo) : undefined;
+      return {
+        text: result.text,
+        ...(result.compaction?.trigger === "auto"
+          ? {
+              autoCompacted: true,
+              autoCompactionPreTokens: result.compaction.preTokens
+            }
+          : {}),
+        ...(todoNotice ? { todoNotice } : {})
+      };
+    } catch (error) {
+      this.logger.error(
+        {
+          err: error,
+          sessionId: options.sessionId,
+          cwd: options.cwd
+        },
+        "scheduled agent execution failed"
+      );
+      throw error;
+    }
+  }
+
   private async runCompactCommand(
     options: Required<Pick<AgentRunOptions, "cwd" | "sessionId">> & Omit<AgentRunOptions, "cwd" | "sessionId">,
     resumeSessionId: string
@@ -278,6 +313,12 @@ function createQueryRequest(
   if (options.model) {
     request.model = options.model;
   }
+  if (options.abortController) {
+    request.abortController = options.abortController;
+  }
+  if (options.interactionContext) {
+    request.interactionContext = options.interactionContext;
+  }
   if (options.maxTurns !== undefined) {
     request.maxTurns = options.maxTurns;
   }
@@ -323,15 +364,34 @@ function normalizeAgentRunOptions(
   if (typeof optionsOrCwd === "string") {
     return {
       cwd: optionsOrCwd,
-      sessionId: sessionIdOverride ?? buildTelegramDirectSessionId(message)
+      sessionId: sessionIdOverride ?? buildTelegramDirectSessionId(message),
+      interactionContext: buildInteractionContext(message)
     };
   }
 
   return {
     ...optionsOrCwd,
     cwd: optionsOrCwd.cwd,
-    sessionId: optionsOrCwd.sessionId ?? buildTelegramDirectSessionId(message)
+    sessionId: optionsOrCwd.sessionId ?? buildTelegramDirectSessionId(message),
+    interactionContext: optionsOrCwd.interactionContext ?? buildInteractionContext(message)
   };
+}
+
+function buildInteractionContext(message: InboundMessage): string {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  return [
+    "Current interaction metadata:",
+    `- channel: ${message.channel}`,
+    `- accountId: ${message.accountId}`,
+    `- chatType: ${message.chatType}`,
+    `- conversationId: ${message.conversationId}`,
+    `- senderId: ${message.senderId}`,
+    `- daemonTimezone: ${timezone}`,
+    "",
+    "If you create or update a scheduled task for this user, use the current conversationId as the Telegram delivery target unless the user explicitly asks for a different target.",
+    "When the user mentions another timezone, convert it to daemonTimezone before creating the scheduled task."
+  ].join("\n");
 }
 
 function toUserFacingFailureMessage(error: unknown): string {
