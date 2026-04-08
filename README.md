@@ -49,7 +49,7 @@ baliclaw config set --path channels.telegram.botToken '<TOKEN>'
 baliclaw config set --path channels.telegram.enabled true
 ```
 
-On first run, BaliClaw creates local state under `~/.baliclaw/`, including a default workspace at `~/.baliclaw/workspace` with `AGENTS.md`, `SOUL.md`, and `USER.md`.
+On first run, BaliClaw creates local state under `~/.baliclaw/`, including a default workspace at `~/.baliclaw/workspace` with `AGENTS.md`, `SOUL.md`, `USER.md`, and `TOOLS.md`.
 
 Phase 1 is focused on a small but working loop:
 
@@ -79,6 +79,8 @@ The current codebase implements the main Phase 1 path:
 - stable per-user session routing
 - Claude Agent SDK integration
 - prompt-only skills loading
+- daemon-native scheduled task support
+- scheduled task CLI / IPC management
 
 ## Requirements
 
@@ -167,6 +169,11 @@ Current CLI command groups:
 - `config set --path <config.path> <value>`
 - `pairing list telegram`
 - `pairing approve telegram <CODE>`
+- `scheduled-tasks list`
+- `scheduled-tasks status <taskId>`
+- `scheduled-tasks create <taskId> '<task-json5>'`
+- `scheduled-tasks update <taskId> '<task-json5>'`
+- `scheduled-tasks delete <taskId>`
 - `daemon start`
 - `tui`
 
@@ -203,6 +210,10 @@ Phase 1 config shape:
   },
   logging: {
     level: "info"
+  },
+  scheduledTasks: {
+    enabled: true,
+    file: "~/.baliclaw/scheduled-tasks.json5"
   }
 }
 ```
@@ -213,6 +224,7 @@ Notes:
 - `runtime.workingDirectory` defaults to the daemon process working directory
 - config writes go through daemon IPC, not direct CLI file writes
 - config updates are hot-reloaded by the daemon
+- scheduled tasks are enabled by default, but no tasks run until tasks are created
 
 ## Pairing Files
 
