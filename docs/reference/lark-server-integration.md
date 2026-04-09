@@ -8,10 +8,11 @@
 ## 2. 对接模式总览
 
 ### 2.1 模式 A：关联已有机器人（existing）
-- 输入：`appId` + `appSecret`。
-- 服务端校验：调用 tenant access token 接口验证凭证可用性。
+- 输入：先显式选择 `feishu` 或 `lark`，再提供 `appId` + `appSecret`。
+- 服务端校验：调用所选 domain 对应的 tenant access token 接口验证凭证可用性。
 - 成功后动作：
 - 写回 `channels.lark` 配置（含 `enabled=true`）。
+- 写回用户所选 `domain`。
 - 触发 daemon reload。
 - 未拿到用户身份信息时，不自动配对，仍走正常 pairing。
 
@@ -46,6 +47,9 @@
 - `expired_token`：二维码过期，提示重试
 
 ### 3.2 已有机器人凭证校验
+- domain 来源：
+- 不做自动识别。
+- `existing` 模式下由 CLI/UI 显式选择 `feishu` 或 `lark`。
 - 接口建议：
 - Feishu：`POST https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal`
 - Lark：`POST https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal`
@@ -96,10 +100,11 @@
 - 登录流程统一超时与错误码映射，保证 CLI 可读报错。
 - WS 连接在 reload/stop 时必须可回收，避免僵尸连接。
 - 凭证写回失败时不得启用 channel；保持原状态并返回错误。
+- `existing` 模式的 domain 必须来自显式选择，不做隐式推断。
 - domain 与凭证必须同一来源（feishu/lark 不混用）。
 
 ## 7. 最小验收清单
 - `baliclaw channels login --channel lark --mode new` 可完成扫码并启用。
-- `baliclaw channels login --channel lark --mode existing --app-id ... --app-secret ...` 可完成校验并启用。
+- `baliclaw channels login --channel lark --mode existing` 可先显式选择 `Feishu/Lark`，再完成凭证校验并启用。
 - 私聊消息可跑通：Lark -> BaliClaw -> Agent -> Lark。
 - 未配对用户走 pairing；new 模式登录用户可自动通过 pairing。

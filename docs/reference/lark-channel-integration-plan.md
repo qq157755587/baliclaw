@@ -4,7 +4,7 @@
 - 在 `baliclaw` 新增 `lark` channel，首版仅支持私聊（DM）。
 - `channels login --channel lark` 完整支持两条路径并与官方一致：
 - 新建机器人：扫码创建并返回凭证，自动写回配置，自动配对登录用户。
-- 关联已有机器人：通过 `appId/appSecret` 校验后接入并写回配置。
+- 关联已有机器人：先显式选择 `feishu` 或 `lark`，再校验 `appId/appSecret` 并写回配置。
 - 实现基于官方流程的登录控制面与运行时适配器，保持现有 Telegram/WeChat 行为不变。
 
 ## Implementation Changes
@@ -13,14 +13,14 @@
 - 扩展 `AppConfig.channels` 新增 `lark`：
 - `enabled`、`appId`、`appSecret`、`domain`（`feishu|lark`，默认 `feishu`）、`connectionMode`（默认 `websocket`）。
 - 扩展 IPC 登录入参/出参类型：
-- `channelLoginStartRequest` 对 `lark` 增加 `mode`（`new|existing`）、`appId`、`appSecret`。
+- `channelLoginStartRequest` 对 `lark` 增加 `mode`（`new|existing`）、`domain`、`appId`、`appSecret`。
 - 保持 `qrDataUrl/sessionKey/message` 通用返回；`lark` 的扫码 URL 复用 `qrDataUrl` 字段。
 
 ### 2) 登录控制面（ChannelControl + LoginManager）
 - 新增 `LarkLoginManager`（结构对齐官方安装流程）：
-- `existing` 模式：调用 tenant access token 接口验证 `appId/appSecret`。
+- `existing` 模式：由用户显式选择 `feishu` 或 `lark`，再调用对应域名的 tenant access token 接口验证 `appId/appSecret`。
 - `new` 模式：走 app registration `init/begin/poll`，返回扫码 URL，处理 `authorization_pending/slow_down/access_denied/expired_token`，成功后拿到 `client_id/client_secret` 与 `user_info.open_id`。
-- 根据 `tenant_brand` 自动切换 `domain`（`feishu`/`lark`）。
+- `new` 模式根据 `tenant_brand` 自动切换 `domain`（`feishu`/`lark`）。
 - `ChannelControlService` 新增 `lark` 分支：
 - 登录成功后写回 `channels.lark` 凭证并 `enabled=true`。
 - 若拿到 `user_info.open_id`，自动执行 `pairingService.approvePrincipal({ channel: "lark", ... })`。
@@ -39,7 +39,8 @@
 
 ### 4) CLI
 - `baliclaw channels login` 增加 Lark 参数：
-- `--channel lark --mode new|existing --app-id <id> --app-secret <secret> [--timeoutMs ...]`
+- `--channel lark --mode new|existing --domain feishu|lark --app-id <id> --app-secret <secret> [--timeoutMs ...]`
+- 当 `existing` 模式未通过命令行传 `domain` 时，CLI 进入交互式单选，显式选择 `Feishu` 或 `Lark`。
 - 输出文案改为通用扫码提示（不写死 WeChat），有 `qrDataUrl` 时统一展示。
 
 ## Public API / Type Changes
@@ -54,11 +55,11 @@
 ## Test Plan
 - `LarkLoginManager` 单测：
 - `new` 流程：扫码 URL、pending、slow_down、expired、access_denied、成功落地。
-- `existing` 流程：凭证有效/无效分支。
+- `existing` 流程：`feishu/lark` 显式选择后的凭证有效/无效分支。
 - `tenant_brand=lark` 的 domain 切换。
 - `ChannelControlService` 单测：
 - `lark new` 登录成功后：配置写回 + `enabled=true` + 自动配对调用。
-- `lark existing` 成功后：配置写回；无 open_id 时不自动配对。
+- `lark existing` 成功后：按用户所选 domain 写回配置；无 open_id 时不自动配对。
 - IPC/CLI 单测：
 - 新请求结构校验、参数透传、输出文案（含 `qrDataUrl`）。
 - daemon/bootstrap 单测：
@@ -68,5 +69,5 @@
 
 ## Assumptions
 - 首版范围固定为 Lark 私聊，不做群聊行为与群策略。
-- `existing` 模式只做凭证校验与接入；自动配对仅在 `new` 模式拿到 `open_id` 时执行。
+- `existing` 模式要求显式选择 `domain`，只做凭证校验与接入；自动配对仅在 `new` 模式拿到 `open_id` 时执行。
 - 以 `@larksuite/openclaw-lark` 的官方安装行为为语义基准，不再依赖旧的 `openclaw-lark-tools` 命令入口约定。

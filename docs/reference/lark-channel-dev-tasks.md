@@ -23,7 +23,7 @@
 
 ### WP2 Lark 登录控制面
 - 任务：新增 `LarkLoginManager`，支持 `new` 和 `existing` 两种登录模式。
-- 产出：登录启动、轮询等待、凭证校验、domain 推断（feishu/lark）。
+- 产出：登录启动、轮询等待、凭证校验、domain 选择（existing）与 domain 推断（new）。
 - 完成标准：两条流程都能返回明确成功/失败状态和可读错误信息。
 
 ### WP3 ChannelControl 接入
@@ -43,7 +43,8 @@
 
 ### WP6 IPC 与 CLI 扩展
 - 任务：扩展 IPC schema/client/server 与 `baliclaw channels login` 参数。
-- 产出：`--channel lark --mode new|existing --app-id --app-secret`。
+- 产出：`--channel lark --mode new|existing --domain --app-id --app-secret`。
+- `existing` 模式支持交互式单选 `Feishu/Lark`，避免用户手输 domain。
 - 完成标准：CLI 可完整驱动两条登录流程，扫码 URL 与状态提示可见。
 
 ### WP7 测试补齐
@@ -63,7 +64,7 @@
 
 ## 交付验收
 - 能通过 CLI 完成 `lark` 的新建机器人登录。
-- 能通过 CLI 完成 `lark` 的已有机器人关联登录。
+- 能通过 CLI 在显式选择 `Feishu/Lark` 后完成 `lark` 的已有机器人关联登录。
 - 登录成功后自动启用 channel 并可接收私聊消息。
 - 未配对用户仍走 pairing 机制；新建机器人登录用户可自动配对。
 - 现有 Telegram/WeChat 功能和测试保持通过。
