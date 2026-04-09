@@ -1,7 +1,7 @@
 {
   "name": "@zhaoyuanjie/baliclaw",
-  "version": "0.6.0",
-  "description": "Local-first Telegram AI gateway built on Claude Agent SDK.",
+  "version": "0.7.0",
+  "description": "Yet another Claw built on Claude Agent SDK.",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/zhaoyouqi/baliclaw",
