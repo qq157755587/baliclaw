@@ -1,6 +1,6 @@
 # BaliClaw
 
-BaliClaw is a local-first AI gateway for Telegram DM workflows.
+BaliClaw is a local-first AI gateway with a multi-channel core. Telegram is currently the only real channel adapter, but the daemon/runtime path is now channel-agnostic and built around adapters plus a shared inbound router.
 
 ## Quick Start
 
@@ -16,7 +16,7 @@ Before starting BaliClaw, make sure your Claude settings are already configured 
 - the required auth token and base URL settings are present when your provider needs them
 - the Claude runtime used by the Agent SDK can authenticate successfully with those settings
 
-If those Claude settings are not valid, BaliClaw will not be able to process Telegram messages.
+If those Claude settings are not valid, BaliClaw will not be able to process inbound channel messages.
 
 If you run BaliClaw as `root`, Claude Code cannot use `bypassPermissions`. In that setup BaliClaw falls back to `dontAsk`, and shell access such as `Bash` also needs to be statically allowed in `~/.claude/settings.json`, for example:
 
@@ -51,14 +51,14 @@ baliclaw config set --path channels.telegram.enabled true
 
 On first run, BaliClaw creates local state under `~/.baliclaw/`, including a default workspace at `~/.baliclaw/workspace` with `AGENTS.md`, `SOUL.md`, `USER.md`, and `TOOLS.md`.
 
-Phase 1 is focused on a small but working loop:
+Current core capabilities:
 
 - a local daemon process
 - a CLI that talks to the daemon over a Unix socket
-- Telegram DM intake
-- pairing / allowlist approval
+- channel adapter intake, with Telegram implemented today
+- channel-aware pairing / allowlist approval
 - Claude Agent SDK execution with stable session IDs
-- reply delivery back to Telegram
+- reply delivery back through the active adapter
 
 The original product and technical documents are kept in:
 
@@ -68,12 +68,13 @@ The original product and technical documents are kept in:
 
 ## Status
 
-The current codebase implements the main Phase 1 path:
+The current codebase implements:
 
 - daemon bootstrap and shutdown
 - config load / save / reload
 - Unix socket IPC
 - CLI status / config / pairing commands
+- channel adapter bootstrap and shared inbound routing
 - Telegram polling and DM normalization
 - pairing request creation and approval
 - stable per-user session routing
@@ -185,7 +186,7 @@ The daemon reads config from:
 ~/.baliclaw/baliclaw.json5
 ```
 
-Phase 1 config shape:
+Current config shape:
 
 ```json5
 {
@@ -225,14 +226,15 @@ Notes:
 - config writes go through daemon IPC, not direct CLI file writes
 - config updates are hot-reloaded by the daemon
 - scheduled tasks are enabled by default, but no tasks run until tasks are created
+- the project is not released yet, so old local config/state file formats are not treated as compatibility targets
 
 ## Pairing Files
 
 Telegram pairing state is stored locally in:
 
 ```text
-~/.baliclaw/pairing/telegram-pending.json
-~/.baliclaw/pairing/telegram-allowlist.json
+~/.baliclaw/pairing/telegram/default-pending.json
+~/.baliclaw/pairing/telegram/default-allowlist.json
 ```
 
 Claude session continuity is stored in:
@@ -241,11 +243,32 @@ Claude session continuity is stored in:
 ~/.baliclaw/sessions/claude-sessions.json
 ```
 
+## Scheduled Task Shape
+
+Scheduled tasks now target a generic delivery object instead of Telegram-specific fields:
+
+```json5
+{
+  schedule: {
+    kind: "daily",
+    time: "09:00"
+  },
+  prompt: "Summarize",
+  delivery: {
+    channel: "telegram",
+    accountId: "default",
+    chatType: "direct",
+    conversationId: "123456789"
+  },
+  timeoutMinutes: 30
+}
+```
+
 ## Development Notes
 
 - Use `pnpm` only.
 - Keep filesystem paths centralized in `src/config/paths.ts`.
-- Keep transport logic in `src/telegram/` and IPC logic in `src/ipc/`.
+- Keep shared channel routing in `src/channel/`, adapter-specific logic in `src/telegram/`, and IPC logic in `src/ipc/`.
 - Keep runtime and prompt behavior in `src/runtime/` and `src/session/`.
 
 ## License
