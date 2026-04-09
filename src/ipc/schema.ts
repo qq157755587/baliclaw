@@ -8,6 +8,7 @@ import { scheduledTaskStatusEntrySchema } from "../runtime/scheduled-task-status
 
 const pairingChannelSchema = z.string().trim().min(1);
 const channelLoginChannelSchema = z.string().trim().min(1);
+const larkDomainSchema = z.enum(["feishu", "lark"]);
 
 export const pairingRequestSchema = z.object({
   channel: z.string(),
@@ -68,10 +69,57 @@ export const pairingListResponseSchema = z.object({
   requests: z.array(pairingRequestSchema)
 });
 
-export const channelLoginStartRequestSchema = z.object({
-  channel: channelLoginChannelSchema,
+const wechatChannelLoginStartRequestSchema = z.object({
+  channel: z.literal("wechat"),
   force: z.boolean().optional()
 });
+
+const larkChannelLoginStartRequestSchema = z.object({
+  channel: z.literal("lark"),
+  force: z.boolean().optional(),
+  mode: z.enum(["new", "existing"]),
+  domain: larkDomainSchema.optional(),
+  appId: z.string().trim().optional(),
+  appSecret: z.string().trim().optional()
+}).superRefine((input, context) => {
+  if (input.mode !== "existing") {
+    return;
+  }
+
+  if (!input.domain) {
+    context.addIssue({
+      code: "custom",
+      message: "domain is required when starting an existing lark login",
+      path: ["domain"]
+    });
+  }
+  if (!input.appId) {
+    context.addIssue({
+      code: "custom",
+      message: "appId is required when starting an existing lark login",
+      path: ["appId"]
+    });
+  }
+  if (!input.appSecret) {
+    context.addIssue({
+      code: "custom",
+      message: "appSecret is required when starting an existing lark login",
+      path: ["appSecret"]
+    });
+  }
+});
+
+export const channelLoginStartRequestSchema = z.union([
+  wechatChannelLoginStartRequestSchema,
+  larkChannelLoginStartRequestSchema,
+  z.object({
+    channel: channelLoginChannelSchema.refine(
+      (channel) => channel !== "wechat" && channel !== "lark",
+      "Use the channel-specific login request shape for this channel"
+    ),
+    force: z.boolean().optional()
+  })
+]);
 
 export const channelLoginStartResponseSchema = z.object({
   channel: channelLoginChannelSchema,

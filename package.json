@@ -41,6 +41,7 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.2.72",
+    "@larksuiteoapi/node-sdk": "^1.60.0",
     "chokidar": "^4.0.3",
     "commander": "^14.0.0",
     "grammy": "^1.38.2",

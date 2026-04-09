@@ -62,4 +62,30 @@ describe("CLI channels commands", () => {
 
     await expect(commandPromise).resolves.toBe("WeChat login completed.");
   });
+
+  it("preserves lark domain selection for new-mode logins", async () => {
+    const client = {
+      startChannelLogin: vi.fn().mockResolvedValue({
+        channel: "lark",
+        sessionKey: "session-lark",
+        qrDataUrl: "https://example.com/lark-qr",
+        message: "Open the URL and complete the Lark authorization flow."
+      }),
+      waitForChannelLogin: vi.fn().mockResolvedValue({
+        channel: "lark",
+        connected: true,
+        message: "Lark login completed."
+      })
+    } as never;
+
+    await runChannelLoginCommand("lark", {
+      mode: "new",
+      domain: "lark"
+    }, client);
+
+    expect(client.startChannelLogin).toHaveBeenCalledWith("lark", {
+      mode: "new",
+      domain: "lark"
+    });
+  });
 });

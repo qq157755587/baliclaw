@@ -11,6 +11,7 @@ import { IpcServer } from "../ipc/server.js";
 import { AgentService, type ScheduledAgentRunOptions } from "../runtime/agent-service.js";
 import { SessionService } from "../session/service.js";
 import { getLogger } from "../shared/logger.js";
+import { LarkService } from "../lark/service.js";
 import { TelegramService, type TelegramPollingBot } from "../telegram/service.js";
 import { WeChatService } from "../wechat/service.js";
 import { ReloadService } from "./reload-service.js";
@@ -29,6 +30,7 @@ export interface BootstrapContext {
   channelRouter: InboundRouter;
   telegramService: TelegramService;
   wechatService: WeChatService;
+  larkService: LarkService;
   scheduledTaskService: ScheduledTaskService;
   reloadService: ReloadService;
   shutdownController: ShutdownController;
@@ -40,6 +42,7 @@ export interface BootstrapOptions {
   ipcServer?: IpcServer;
   telegramService?: TelegramService;
   wechatService?: WeChatService;
+  larkService?: LarkService;
   telegramBot?: TelegramPollingBot;
   pairingService?: PairingService;
   sessionService?: SessionService;
@@ -80,6 +83,9 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   const wechatLogger = getLogger("wechat", {
     level: currentConfig.logging.level
   });
+  const larkLogger = getLogger("lark", {
+    level: currentConfig.logging.level
+  });
   const pairingService = options.pairingService ?? new PairingService();
   const sessionService = options.sessionService ?? new SessionService();
   const agentService = options.agentService ?? new AgentService({
@@ -90,6 +96,7 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
 
   let activeTelegramService = options.telegramService ?? createTelegramService();
   let activeWeChatService = options.wechatService ?? createWeChatService();
+  let activeLarkService = options.larkService ?? createLarkService();
   let activeScheduledTaskService = options.scheduledTaskService ?? new ScheduledTaskService();
 
   const channelRouter = new InboundRouter({
@@ -108,6 +115,7 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
 
   setAdapterInboundHandler(activeTelegramService);
   setAdapterInboundHandler(activeWeChatService);
+  setAdapterInboundHandler(activeLarkService);
 
   const activateTelegramService = (service: TelegramService, enabled: boolean): void => {
     activeTelegramService = service;
@@ -131,6 +139,18 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     }
 
     adapters.delete(activeWeChatService.channelId);
+  };
+
+  const activateLarkService = (service: LarkService, enabled: boolean): void => {
+    activeLarkService = service;
+    setAdapterInboundHandler(activeLarkService);
+
+    if (enabled) {
+      adapters.set(activeLarkService.channelId, activeLarkService);
+      return;
+    }
+
+    adapters.delete(activeLarkService.channelId);
   };
 
   const sendChannelText = async (
@@ -263,6 +283,42 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     }
   };
 
+  const reconcileLarkService = async (nextConfig: AppConfig, previousConfig: AppConfig): Promise<void> => {
+    const nextLarkConfig = getLarkChannelConfig(nextConfig);
+    const previousLarkConfig = getLarkChannelConfig(previousConfig);
+    const larkChanged = nextLarkConfig.enabled !== previousLarkConfig.enabled
+      || nextLarkConfig.appId !== previousLarkConfig.appId
+      || nextLarkConfig.appSecret !== previousLarkConfig.appSecret
+      || nextLarkConfig.domain !== previousLarkConfig.domain
+      || nextLarkConfig.connectionMode !== previousLarkConfig.connectionMode;
+
+    if (!larkChanged) {
+      return;
+    }
+
+    if (previousLarkConfig.enabled) {
+      await activeLarkService.stop();
+    }
+
+    if (options.larkService) {
+      activateLarkService(options.larkService, nextLarkConfig.enabled);
+      if (nextLarkConfig.enabled) {
+        await activeLarkService.start();
+      }
+      return;
+    }
+
+    const nextService = nextLarkConfig.enabled
+      ? createLarkService(nextLarkConfig.appId, nextLarkConfig.appSecret, nextLarkConfig.domain)
+      : createLarkService();
+
+    activateLarkService(nextService, nextLarkConfig.enabled);
+
+    if (nextLarkConfig.enabled) {
+      await activeLarkService.start();
+    }
+  };
+
   const reconcileScheduledTaskService = async (nextConfig: AppConfig, previousConfig: AppConfig): Promise<void> => {
     const scheduledTasksChanged =
       nextConfig.scheduledTasks.enabled !== previousConfig.scheduledTasks.enabled ||
@@ -310,9 +366,11 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
       scheduledTaskLogger.level = nextConfig.logging.level;
       telegramLogger.level = nextConfig.logging.level;
       wechatLogger.level = nextConfig.logging.level;
+      larkLogger.level = nextConfig.logging.level;
 
       await reconcileTelegramService(nextConfig, previousConfig);
       await reconcileWeChatService(nextConfig, previousConfig);
+      await reconcileLarkService(nextConfig, previousConfig);
       await reconcileScheduledTaskService(nextConfig, previousConfig);
     }
   });
@@ -324,6 +382,18 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     onChannelCredentialsUpdated: async (channel) => {
       const wechatConfig = getWeChatChannelConfig(currentConfig);
       if (channel !== "wechat" || !wechatConfig.enabled) {
+        const larkConfig = getLarkChannelConfig(currentConfig);
+        if (channel !== "lark" || !larkConfig.enabled) {
+          return;
+        }
+
+        await activeLarkService.stop();
+        if (options.larkService) {
+          activateLarkService(options.larkService, true);
+        } else {
+          activateLarkService(createLarkService(larkConfig.appId, larkConfig.appSecret, larkConfig.domain), true);
+        }
+        await activeLarkService.start();
         return;
       }
 
@@ -342,8 +412,8 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     configService,
     pairingService,
     channelControlService,
-    supportedPairingChannels: ["telegram", "wechat"],
-    supportedLoginChannels: ["wechat"],
+    supportedPairingChannels: ["telegram", "wechat", "lark"],
+    supportedLoginChannels: ["wechat", "lark"],
     reloadConfig: async () => await reloadService.reload("ipc")
   });
 
@@ -381,6 +451,25 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     activateWeChatService(activeWeChatService, false);
   }
 
+  const currentLarkConfig = getLarkChannelConfig(currentConfig);
+  if (currentLarkConfig.enabled) {
+    if (options.larkService) {
+      activateLarkService(options.larkService, true);
+    } else {
+      activateLarkService(
+        createLarkService(
+          currentLarkConfig.appId,
+          currentLarkConfig.appSecret,
+          currentLarkConfig.domain
+        ),
+        true
+      );
+    }
+    await activeLarkService.start();
+  } else {
+    activateLarkService(activeLarkService, false);
+  }
+
   if (currentConfig.scheduledTasks.enabled) {
     activeScheduledTaskService = options.scheduledTaskService ?? createConfiguredScheduledTaskService(currentConfig);
     await activeScheduledTaskService.start();
@@ -393,6 +482,10 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   shutdownController.add({
     name: "wechat",
     close: async () => activeWeChatService.stop()
+  });
+  shutdownController.add({
+    name: "lark",
+    close: async () => activeLarkService.stop()
   });
   shutdownController.add({
     name: "scheduled-tasks",
@@ -418,6 +511,7 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     channelRouter,
     telegramService: activeTelegramService,
     wechatService: activeWeChatService,
+    larkService: activeLarkService,
     scheduledTaskService: activeScheduledTaskService,
     reloadService,
     shutdownController
@@ -437,6 +531,15 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     return new WeChatService({
       apiBaseUrl: apiBaseUrl || getWeChatChannelConfig(currentConfig).apiBaseUrl,
       logger: wechatLogger
+    });
+  }
+
+  function createLarkService(appId = "", appSecret = "", domain: "feishu" | "lark" = "feishu"): LarkService {
+    return new LarkService({
+      appId,
+      appSecret,
+      domain,
+      logger: larkLogger
     });
   }
 }
@@ -510,5 +613,26 @@ function getWeChatChannelConfig(config: {
     enabled: wechat?.enabled ?? false,
     apiBaseUrl: wechat?.apiBaseUrl ?? "https://ilinkai.weixin.qq.com",
     botType: wechat?.botType ?? "3"
+  };
+}
+
+function getLarkChannelConfig(config: {
+  channels?: {
+    lark?: {
+      enabled?: boolean;
+      appId?: string;
+      appSecret?: string;
+      domain?: "feishu" | "lark";
+      connectionMode?: "websocket";
+    };
+  };
+}) {
+  const lark = config.channels?.lark;
+  return {
+    enabled: lark?.enabled ?? false,
+    appId: lark?.appId ?? "",
+    appSecret: lark?.appSecret ?? "",
+    domain: lark?.domain ?? "feishu",
+    connectionMode: lark?.connectionMode ?? "websocket"
   };
 }

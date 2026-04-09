@@ -87,11 +87,29 @@ channelsCommand
   .command("login")
   .description("Start a channel login flow")
   .requiredOption("--channel <channel>", "channel id, for example wechat")
+  .option("--mode <mode>", "login mode for lark: new or existing")
+  .option("--domain <domain>", "lark domain for existing mode: feishu or lark")
+  .option("--app-id <appId>", "lark app id for existing mode")
+  .option("--app-secret <appSecret>", "lark app secret for existing mode")
   .option("--timeoutMs <timeoutMs>", "how long to wait for the login confirmation in milliseconds")
   .option("--verbose", "include extra local output")
-  .action(async (options: { channel: string; timeoutMs?: string; verbose?: boolean }) => {
+  .action(async (
+    options: {
+      channel: string;
+      mode?: "new" | "existing";
+      domain?: "feishu" | "lark";
+      appId?: string;
+      appSecret?: string;
+      timeoutMs?: string;
+      verbose?: boolean;
+    }
+  ) => {
     const timeoutMs = options.timeoutMs ? Number.parseInt(options.timeoutMs, 10) : undefined;
     console.log(await runChannelLoginCommand(options.channel, {
+      ...(options.mode !== undefined ? { mode: options.mode } : {}),
+      ...(options.domain !== undefined ? { domain: options.domain } : {}),
+      ...(options.appId !== undefined ? { appId: options.appId } : {}),
+      ...(options.appSecret !== undefined ? { appSecret: options.appSecret } : {}),
       ...(Number.isFinite(timeoutMs) ? { timeoutMs } : {}),
       ...(options.verbose !== undefined ? { verbose: options.verbose } : {}),
       onProgressOutput: (text: string) => {

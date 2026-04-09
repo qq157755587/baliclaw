@@ -56,6 +56,13 @@ describe("IpcClient", () => {
   it("supports config get and set over the shared transport", async () => {
     const config: AppConfig = {
       channels: {
+        lark: {
+          enabled: false,
+          appId: "",
+          appSecret: "",
+          domain: "feishu",
+          connectionMode: "websocket"
+        },
         telegram: {
           enabled: false,
           botToken: ""

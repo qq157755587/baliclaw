@@ -2,7 +2,7 @@ import { request } from "node:http";
 import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getAppPaths } from "../src/config/paths.js";
 import { IpcServer } from "../src/ipc/server.js";
 import { APP_VERSION } from "../src/shared/version.js";
@@ -404,6 +404,55 @@ describe("IpcServer", () => {
       await server.stop();
 
       await expect(access(paths.socketFile)).rejects.toBeDefined();
+    } finally {
+      await server.stop();
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects malformed lark login start payloads instead of falling back to a generic login shape", async () => {
+    const home = await mkdtemp(join(tmpdir(), "bc-ipc-lark-"));
+    const paths = getAppPaths(home);
+    const startLogin = vi.fn(async () => ({
+      channel: "lark",
+      sessionKey: "session-123",
+      message: "unexpected"
+    }));
+    const server = new IpcServer({
+      paths,
+      supportedLoginChannels: ["lark"],
+      channelControlService: {
+        startLogin,
+        waitForLogin: async () => ({
+          channel: "lark",
+          connected: true,
+          message: "unexpected"
+        })
+      } as never
+    });
+
+    try {
+      await server.start();
+
+      await expect(
+        requestJson(paths.socketFile, "/v1/channels/login/start", {
+          method: "POST",
+          body: {
+            channel: "lark",
+            mode: "existing",
+            appId: "cli_a"
+          }
+        })
+      ).resolves.toMatchObject({
+        statusCode: 500,
+        body: {
+          ok: false,
+          error: {
+            code: "IPC_INTERNAL_ERROR"
+          }
+        }
+      });
+      expect(startLogin).not.toHaveBeenCalled();
     } finally {
       await server.stop();
       await rm(home, { recursive: true, force: true });

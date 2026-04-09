@@ -7,6 +7,13 @@ import type { AppConfig } from "../src/config/schema.js";
 
 const config: AppConfig = {
   channels: {
+    lark: {
+      enabled: false,
+      appId: "",
+      appSecret: "",
+      domain: "feishu",
+      connectionMode: "websocket"
+    },
     telegram: {
       enabled: false,
       botToken: ""
@@ -68,6 +75,13 @@ describe("CLI config commands", () => {
 
     expect(client.setConfig).toHaveBeenCalledWith({
       channels: {
+        lark: {
+          enabled: false,
+          appId: "",
+          appSecret: "",
+          domain: "feishu",
+          connectionMode: "websocket"
+        },
         telegram: {
           enabled: false,
           botToken: ""
@@ -127,6 +141,13 @@ describe("CLI config commands", () => {
 
       expect(client.setConfig).toHaveBeenCalledWith({
         channels: {
+          lark: {
+            enabled: false,
+            appId: "",
+            appSecret: "",
+            domain: "feishu",
+            connectionMode: "websocket"
+          },
           telegram: {
             enabled: false,
             botToken: ""
@@ -186,6 +207,7 @@ describe("CLI config commands", () => {
     expect(client.setConfig).toHaveBeenCalledWith({
       ...config,
       channels: {
+        lark: config.channels.lark,
         telegram: {
           enabled: false,
           botToken: "8793336326:example-token"

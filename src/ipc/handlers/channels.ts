@@ -5,6 +5,10 @@ export async function handleChannelLoginStart(
   input: {
     channel: string;
     force?: boolean;
+    mode?: "new" | "existing";
+    domain?: "feishu" | "lark";
+    appId?: string;
+    appSecret?: string;
   }
 ) {
   return await channelControlService.startLogin(input);

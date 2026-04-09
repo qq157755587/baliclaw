@@ -68,7 +68,13 @@ export class IpcClient {
     });
   }
 
-  async startChannelLogin(channel: string, options: { force?: boolean } = {}): Promise<{
+  async startChannelLogin(channel: string, options: {
+    force?: boolean;
+    mode?: "new" | "existing";
+    domain?: "feishu" | "lark";
+    appId?: string;
+    appSecret?: string;
+  } = {}): Promise<{
     channel: string;
     sessionKey: string;
     qrDataUrl?: string;
@@ -79,7 +85,11 @@ export class IpcClient {
       method: "POST",
       body: {
         channel,
-        ...(options.force !== undefined ? { force: options.force } : {})
+        ...(options.force !== undefined ? { force: options.force } : {}),
+        ...(options.mode !== undefined ? { mode: options.mode } : {}),
+        ...(options.domain !== undefined ? { domain: options.domain } : {}),
+        ...(options.appId !== undefined ? { appId: options.appId } : {}),
+        ...(options.appSecret !== undefined ? { appSecret: options.appSecret } : {})
       }
     });
 

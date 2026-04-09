@@ -42,6 +42,13 @@ class FakeProcess extends EventEmitter {
 
 const defaultConfig: AppConfig = {
   channels: {
+    lark: {
+      enabled: false,
+      appId: "",
+      appSecret: "",
+      domain: "feishu",
+      connectionMode: "websocket"
+    },
     telegram: {
       enabled: false,
       botToken: ""

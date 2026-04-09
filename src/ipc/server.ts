@@ -239,7 +239,11 @@ export class IpcServer {
 
         this.writeJson(response, 200, await handleChannelLoginStart(this.channelControlService, {
           channel: body.channel,
-          ...(body.force !== undefined ? { force: body.force } : {})
+          ...(body.force !== undefined ? { force: body.force } : {}),
+          ...("mode" in body && body.mode !== undefined ? { mode: body.mode } : {}),
+          ...("domain" in body && body.domain !== undefined ? { domain: body.domain } : {}),
+          ...("appId" in body && body.appId !== undefined ? { appId: body.appId } : {}),
+          ...("appSecret" in body && body.appSecret !== undefined ? { appSecret: body.appSecret } : {})
         }));
         return;
       }

@@ -58,9 +58,18 @@ const wechatConfigSchema = z.object({
   botType: z.string().trim().default("3")
 }).strict();
 
+const larkConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  appId: z.string().trim().default(""),
+  appSecret: z.string().trim().default(""),
+  domain: z.enum(["feishu", "lark"]).default("feishu"),
+  connectionMode: z.literal("websocket").default("websocket")
+}).strict();
+
 const channelsConfigSchema = z.object({
   telegram: withObjectDefaults(telegramConfigSchema),
-  wechat: withObjectDefaults(wechatConfigSchema)
+  wechat: withObjectDefaults(wechatConfigSchema),
+  lark: withObjectDefaults(larkConfigSchema)
 }).strict();
 
 const runtimeConfigSchema = z.object({
@@ -113,6 +122,22 @@ export const appConfigSchema = z.object({
       code: "custom",
       message: "channels.telegram.botToken is required when channels.telegram.enabled is true",
       path: ["channels", "telegram", "botToken"]
+    });
+  }
+
+  if (config.channels.lark.enabled && config.channels.lark.appId.trim().length === 0) {
+    context.addIssue({
+      code: "custom",
+      message: "channels.lark.appId is required when channels.lark.enabled is true",
+      path: ["channels", "lark", "appId"]
+    });
+  }
+
+  if (config.channels.lark.enabled && config.channels.lark.appSecret.trim().length === 0) {
+    context.addIssue({
+      code: "custom",
+      message: "channels.lark.appSecret is required when channels.lark.enabled is true",
+      path: ["channels", "lark", "appSecret"]
     });
   }
 });
