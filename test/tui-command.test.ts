@@ -8,6 +8,11 @@ const baseConfig: AppConfig = {
     telegram: {
       enabled: false,
       botToken: ""
+    },
+    wechat: {
+      enabled: false,
+      apiBaseUrl: "https://ilinkai.weixin.qq.com",
+      botType: "3"
     }
   },
   runtime: {

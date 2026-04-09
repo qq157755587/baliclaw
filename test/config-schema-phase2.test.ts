@@ -106,6 +106,11 @@ describe("appConfigSchema Phase 2", () => {
   it("fills all new sections when parsing an empty config", () => {
     const config = appConfigSchema.parse({});
 
+    expect(config.channels.wechat).toEqual({
+      enabled: false,
+      apiBaseUrl: "https://ilinkai.weixin.qq.com",
+      botType: "3"
+    });
     expect(config.mcp).toEqual({ servers: {} });
     expect(config.agents).toEqual({});
     expect(config.memory).toEqual({
@@ -167,6 +172,11 @@ describe("appConfigSchema Phase 2", () => {
     });
 
     expect(config.channels.telegram.enabled).toBe(true);
+    expect(config.channels.wechat).toEqual({
+      enabled: false,
+      apiBaseUrl: "https://ilinkai.weixin.qq.com",
+      botType: "3"
+    });
     expect(config.runtime.systemPromptFile).toBe("/tmp/system.md");
     expect(config.runtime.loadFilesystemSettings).toBe(true);
     expect(config.mcp.servers).toEqual({});

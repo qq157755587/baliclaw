@@ -21,7 +21,8 @@ export async function runDaemon(options: RunDaemonOptions = {}): Promise<void> {
     context.logger.info(
       {
         cwd: context.config.runtime.workingDirectory,
-        telegramEnabled: context.config.channels.telegram.enabled
+        telegramEnabled: context.config.channels.telegram.enabled,
+        wechatEnabled: context.config.channels.wechat?.enabled ?? false
       },
       "daemon bootstrapped"
     );

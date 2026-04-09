@@ -4,6 +4,8 @@ import { type AppConfig } from "../config/schema.js";
 import { AppError, appErrorCodes, toAppError } from "../shared/errors.js";
 import type { AppStatus, PairingRequest } from "../shared/types.js";
 import {
+  channelLoginStartResponseSchema,
+  channelLoginWaitResponseSchema,
   configResponseSchema,
   ipcErrorResponseSchema,
   pairingApproveResponseSchema,
@@ -63,6 +65,45 @@ export class IpcClient {
       invalidMessage: "Invalid IPC config response",
       method: "POST",
       body: config
+    });
+  }
+
+  async startChannelLogin(channel: string, options: { force?: boolean } = {}): Promise<{
+    channel: string;
+    sessionKey: string;
+    qrDataUrl?: string;
+    message: string;
+  }> {
+    const response = await this.performRequest("/v1/channels/login/start", channelLoginStartResponseSchema, {
+      invalidMessage: "Invalid IPC channel login start response",
+      method: "POST",
+      body: {
+        channel,
+        ...(options.force !== undefined ? { force: options.force } : {})
+      }
+    });
+
+    return {
+      channel: response.channel,
+      sessionKey: response.sessionKey,
+      ...(response.qrDataUrl ? { qrDataUrl: response.qrDataUrl } : {}),
+      message: response.message
+    };
+  }
+
+  async waitForChannelLogin(channel: string, sessionKey: string, timeoutMs?: number): Promise<{
+    channel: string;
+    connected: boolean;
+    message: string;
+  }> {
+    return await this.performRequest("/v1/channels/login/wait", channelLoginWaitResponseSchema, {
+      invalidMessage: "Invalid IPC channel login wait response",
+      method: "POST",
+      body: {
+        channel,
+        sessionKey,
+        ...(timeoutMs !== undefined ? { timeoutMs } : {})
+      }
     });
   }
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { runChannelLoginCommand } from "./commands/channels.js";
 import { runConfigGetCommand, runConfigSetCommand } from "./commands/config.js";
 import { runDaemonCommand } from "./commands/daemon.js";
 import { runPairingApproveCommand, runPairingListCommand } from "./commands/pairing.js";
@@ -76,6 +77,27 @@ pairingCommand
   .argument("<code>", "pairing code to approve")
   .action(async (channel: string, code: string) => {
     console.log(await runPairingApproveCommand(channel, code));
+  });
+
+const channelsCommand = program
+  .command("channels")
+  .description("Generic channel control-plane operations");
+
+channelsCommand
+  .command("login")
+  .description("Start a channel login flow")
+  .requiredOption("--channel <channel>", "channel id, for example wechat")
+  .option("--timeoutMs <timeoutMs>", "how long to wait for the login confirmation in milliseconds")
+  .option("--verbose", "include extra local output")
+  .action(async (options: { channel: string; timeoutMs?: string; verbose?: boolean }) => {
+    const timeoutMs = options.timeoutMs ? Number.parseInt(options.timeoutMs, 10) : undefined;
+    console.log(await runChannelLoginCommand(options.channel, {
+      ...(Number.isFinite(timeoutMs) ? { timeoutMs } : {}),
+      ...(options.verbose !== undefined ? { verbose: options.verbose } : {}),
+      onProgressOutput: (text: string) => {
+        console.log(text);
+      }
+    }));
   });
 
 const scheduledTasksCommand = program

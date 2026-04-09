@@ -52,8 +52,15 @@ const telegramConfigSchema = z.object({
   botToken: z.string().default("")
 }).strict();
 
+const wechatConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  apiBaseUrl: z.string().trim().default("https://ilinkai.weixin.qq.com"),
+  botType: z.string().trim().default("3")
+}).strict();
+
 const channelsConfigSchema = z.object({
-  telegram: withObjectDefaults(telegramConfigSchema)
+  telegram: withObjectDefaults(telegramConfigSchema),
+  wechat: withObjectDefaults(wechatConfigSchema)
 }).strict();
 
 const runtimeConfigSchema = z.object({

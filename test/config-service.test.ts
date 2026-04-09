@@ -18,6 +18,11 @@ describe("ConfigService", () => {
         enabled: false,
         botToken: ""
       });
+      expect(config.channels.wechat).toEqual({
+        enabled: false,
+        apiBaseUrl: "https://ilinkai.weixin.qq.com",
+        botType: "3"
+      });
       expect(config.runtime.workingDirectory).toBe(join(home, ".baliclaw", "workspace"));
       expect(config.tools.availableTools).toEqual(["Bash", "Read", "Write", "Edit"]);
       expect(config.skills).toEqual({
@@ -75,6 +80,11 @@ describe("ConfigService", () => {
       expect(config.channels.telegram).toEqual({
         enabled: true,
         botToken: "secret"
+      });
+      expect(config.channels.wechat).toEqual({
+        enabled: false,
+        apiBaseUrl: "https://ilinkai.weixin.qq.com",
+        botType: "3"
       });
       expect(config.runtime.model).toBe("claude-sonnet");
       expect(config.runtime.maxTurns).toBe(12);
@@ -220,6 +230,11 @@ describe("ConfigService", () => {
           telegram: {
             enabled: false,
             botToken: ""
+          },
+          wechat: {
+            enabled: false,
+            apiBaseUrl: "https://ilinkai.weixin.qq.com",
+            botType: "3"
           }
         },
         runtime: {

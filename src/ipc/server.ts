@@ -3,6 +3,7 @@ import { mkdir, stat, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { Logger } from "pino";
 import { PairingService } from "../auth/pairing-service.js";
+import { ChannelControlService } from "../channel/control.js";
 import { ScheduledTaskConfigService } from "../config/scheduled-task-config.js";
 import { appConfigSchema } from "../config/schema.js";
 import { ConfigService } from "../config/service.js";
@@ -12,6 +13,7 @@ import { ScheduledTaskStatusStore } from "../runtime/scheduled-task-status-store
 import { getLogger } from "../shared/logger.js";
 import type { AppStatus } from "../shared/types.js";
 import { APP_VERSION } from "../shared/version.js";
+import { handleChannelLoginStart, handleChannelLoginWait } from "./handlers/channels.js";
 import { handleConfigGet, handleConfigSet } from "./handlers/config.js";
 import { handlePairingApprove, handlePairingList } from "./handlers/pairing.js";
 import {
@@ -23,6 +25,8 @@ import {
 } from "./handlers/scheduled-tasks.js";
 import { handleStatus } from "./handlers/status.js";
 import {
+  channelLoginStartRequestSchema,
+  channelLoginWaitRequestSchema,
   pairingApproveRequestSchema,
   scheduledTaskCreateRequestSchema,
   scheduledTaskDeleteRequestSchema,
@@ -37,7 +41,9 @@ export interface IpcServerOptions {
   configService?: ConfigService;
   scheduledTaskManager?: ScheduledTaskManager;
   pairingService?: PairingService;
+  channelControlService?: ChannelControlService;
   supportedPairingChannels?: string[];
+  supportedLoginChannels?: string[];
   reloadConfig?: () => Promise<object>;
   getStatus?: () => Promise<AppStatus> | AppStatus;
 }
@@ -48,7 +54,9 @@ export class IpcServer {
   private readonly configService: ConfigService;
   private readonly scheduledTaskManager: ScheduledTaskManager;
   private readonly pairingService: PairingService;
+  private readonly channelControlService: ChannelControlService | undefined;
   private readonly supportedPairingChannels: Set<string>;
+  private readonly supportedLoginChannels: Set<string>;
   private readonly reloadConfig: (() => Promise<object>) | undefined;
   private readonly resolveStatus: () => Promise<AppStatus> | AppStatus;
   private server: Server | null = null;
@@ -63,7 +71,9 @@ export class IpcServer {
       this.paths
     );
     this.pairingService = options.pairingService ?? new PairingService();
+    this.channelControlService = options.channelControlService;
     this.supportedPairingChannels = new Set(options.supportedPairingChannels ?? ["telegram"]);
+    this.supportedLoginChannels = new Set(options.supportedLoginChannels ?? []);
     this.reloadConfig = options.reloadConfig;
     this.resolveStatus = options.getStatus ?? (() => ({
       ok: true,
@@ -200,6 +210,69 @@ export class IpcServer {
           taskId,
           status: await handleScheduledTaskStatus(this.scheduledTaskManager, taskId)
         });
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/v1/channels/login/start") {
+        if (!this.channelControlService) {
+          this.writeJson(response, 404, {
+            ok: false,
+            error: {
+              code: "IPC_ROUTE_NOT_FOUND",
+              message: "Channel login is not configured"
+            }
+          } satisfies IpcErrorResponse);
+          return;
+        }
+
+        const body = channelLoginStartRequestSchema.parse(await this.readJsonBody(request));
+        if (!this.supportedLoginChannels.has(body.channel)) {
+          this.writeJson(response, 400, {
+            ok: false,
+            error: {
+              code: "IPC_INVALID_REQUEST",
+              message: `Unsupported login channel: ${body.channel}`
+            }
+          } satisfies IpcErrorResponse);
+          return;
+        }
+
+        this.writeJson(response, 200, await handleChannelLoginStart(this.channelControlService, {
+          channel: body.channel,
+          ...(body.force !== undefined ? { force: body.force } : {})
+        }));
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/v1/channels/login/wait") {
+        if (!this.channelControlService) {
+          this.writeJson(response, 404, {
+            ok: false,
+            error: {
+              code: "IPC_ROUTE_NOT_FOUND",
+              message: "Channel login is not configured"
+            }
+          } satisfies IpcErrorResponse);
+          return;
+        }
+
+        const body = channelLoginWaitRequestSchema.parse(await this.readJsonBody(request));
+        if (!this.supportedLoginChannels.has(body.channel)) {
+          this.writeJson(response, 400, {
+            ok: false,
+            error: {
+              code: "IPC_INVALID_REQUEST",
+              message: `Unsupported login channel: ${body.channel}`
+            }
+          } satisfies IpcErrorResponse);
+          return;
+        }
+
+        this.writeJson(response, 200, await handleChannelLoginWait(this.channelControlService, {
+          channel: body.channel,
+          sessionKey: body.sessionKey,
+          ...(body.timeoutMs !== undefined ? { timeoutMs: body.timeoutMs } : {})
+        }));
         return;
       }
 

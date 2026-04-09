@@ -59,6 +59,11 @@ describe("IpcClient", () => {
         telegram: {
           enabled: false,
           botToken: ""
+        },
+        wechat: {
+          enabled: false,
+          apiBaseUrl: "https://ilinkai.weixin.qq.com",
+          botType: "3"
         }
       },
       runtime: {
@@ -151,6 +156,49 @@ describe("IpcClient", () => {
 
     await expect(client.listPairingRequests("telegram")).resolves.toEqual([request]);
     await expect(client.approvePairingCode("telegram", "ABCD2345")).resolves.toEqual(request);
+  });
+
+  it("supports channel login start and wait over the shared transport", async () => {
+    const client = new IpcClient({
+      requestJson: async (path, init) => {
+        if (path === "/v1/channels/login/start" && init?.method === "POST") {
+          return {
+            statusCode: 200,
+            body: {
+              channel: "wechat",
+              sessionKey: "session-123",
+              qrDataUrl: "https://example.com/qr",
+              message: "Scan the QR code with WeChat to complete login."
+            }
+          };
+        }
+
+        if (path === "/v1/channels/login/wait" && init?.method === "POST") {
+          return {
+            statusCode: 200,
+            body: {
+              channel: "wechat",
+              connected: true,
+              message: "WeChat login completed."
+            }
+          };
+        }
+
+        throw new Error(`unexpected path: ${path}`);
+      }
+    });
+
+    await expect(client.startChannelLogin("wechat")).resolves.toEqual({
+      channel: "wechat",
+      sessionKey: "session-123",
+      qrDataUrl: "https://example.com/qr",
+      message: "Scan the QR code with WeChat to complete login."
+    });
+    await expect(client.waitForChannelLogin("wechat", "session-123", 5_000)).resolves.toEqual({
+      channel: "wechat",
+      connected: true,
+      message: "WeChat login completed."
+    });
   });
 
   it("supports scheduled task management over the shared transport", async () => {

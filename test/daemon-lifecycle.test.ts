@@ -45,6 +45,11 @@ const defaultConfig: AppConfig = {
     telegram: {
       enabled: false,
       botToken: ""
+    },
+    wechat: {
+      enabled: false,
+      apiBaseUrl: "https://ilinkai.weixin.qq.com",
+      botType: "3"
     }
   },
   runtime: {
@@ -131,7 +136,8 @@ describe("bootstrap", () => {
               telegram: {
                 enabled: true,
                 botToken: "secret"
-              }
+              },
+              wechat: defaultConfig.channels.wechat
             }
           })
         } as never
@@ -142,6 +148,50 @@ describe("bootstrap", () => {
       await context.shutdownController.shutdown();
 
       expect(telegramService.stop).toHaveBeenCalledTimes(1);
+      expect(ipcServer.stop).toHaveBeenCalledTimes(1);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("starts wechat only when enabled and registers a stop hook", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-wechat-"));
+    const paths = getAppPaths(home);
+    const ipcServer = {
+      start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+      stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+    } as never;
+    const wechatService = {
+      start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+      stop: vi.fn<() => Promise<void>>().mockResolvedValue(),
+      setInboundHandler: vi.fn()
+    } as never;
+
+    try {
+      const context = await bootstrap({
+        paths,
+        ipcServer,
+        wechatService,
+        configService: {
+          load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
+            ...defaultConfig,
+            channels: {
+              telegram: defaultConfig.channels.telegram,
+              wechat: {
+                enabled: true,
+                apiBaseUrl: "https://ilinkai.weixin.qq.com",
+                botType: "3"
+              }
+            }
+          })
+        } as never
+      });
+
+      expect(wechatService.start).toHaveBeenCalledTimes(1);
+
+      await context.shutdownController.shutdown();
+
+      expect(wechatService.stop).toHaveBeenCalledTimes(1);
       expect(ipcServer.stop).toHaveBeenCalledTimes(1);
     } finally {
       await rm(home, { recursive: true, force: true });

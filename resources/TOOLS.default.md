@@ -19,7 +19,8 @@ Common examples:
 - `baliclaw status`
 - `baliclaw config get`
 - `baliclaw config set runtime.model '"claude-sonnet"'`
-- `baliclaw pairing list`
+- `baliclaw pairing list telegram`
+- `baliclaw channels login --channel wechat`
 - `baliclaw scheduled-tasks list`
 
 ## Config Management
@@ -44,10 +45,9 @@ Use pairing commands for allowlist workflows instead of editing pairing files di
 
 Useful commands:
 
-- `baliclaw pairing list`
-- `baliclaw pairing pending`
-- `baliclaw pairing approve <senderId>`
-- `baliclaw pairing revoke <senderId>`
+- `baliclaw pairing list telegram`
+- `baliclaw pairing list wechat`
+- `baliclaw pairing approve <channel> <code>`
 
 ## Scheduled Task Management
 
@@ -67,7 +67,7 @@ A scheduled task definition is a JSON5 object with:
 
 - `schedule`
 - `prompt`
-- `telegram.conversationId`
+- `delivery`
 - `timeoutMinutes`
 
 Supported schedule shapes:
@@ -79,7 +79,7 @@ Supported schedule shapes:
 ### Scheduled Task Operating Rules
 
 - When the user asks to create or update a scheduled task, infer a stable `taskId` when needed and then use the scheduled task CLI/control plane.
-- Unless the user explicitly asks for another Telegram target, use the current conversationId from interaction context as `telegram.conversationId`.
+- Unless the user explicitly asks for another target, use the current channel/accountId/chatType/conversationId from interaction context as `delivery`.
 - If the user explicitly mentions another timezone, convert that requested time into the daemon machine's local timezone before writing the task schedule.
 - If the user does not specify a timeout, set `timeoutMinutes: 30`.
 - After creating or updating a task, report the final applied task details clearly.

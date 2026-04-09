@@ -15,6 +15,12 @@ export interface CreatePairingRequestInput {
   now?: Date;
 }
 
+export interface ApprovePairingPrincipalInput {
+  channel: string;
+  accountId?: string;
+  principalKey: string;
+}
+
 export class PairingService {
   constructor(private readonly store = new PairingStore()) {}
 
@@ -103,6 +109,28 @@ export class PairingService {
 
     if (activeRequests.length !== pending.requests.length) {
       await this.store.savePendingRequests(channel, { requests: activeRequests }, accountId);
+    }
+  }
+
+  async approvePrincipal(input: ApprovePairingPrincipalInput): Promise<void> {
+    const accountId = input.accountId ?? "default";
+    const principalKey = input.principalKey.trim();
+
+    if (principalKey.length === 0) {
+      throw new Error("Principal key must not be empty");
+    }
+
+    const allowlist = await this.store.loadAllowlist(input.channel, accountId);
+    if (!allowlist.approvedPrincipalKeys.includes(principalKey)) {
+      await this.store.saveAllowlist(input.channel, {
+        approvedPrincipalKeys: [...allowlist.approvedPrincipalKeys, principalKey]
+      }, accountId);
+    }
+
+    const pending = await this.store.loadPendingRequests(input.channel, accountId);
+    const remainingRequests = pending.requests.filter((request) => request.principalKey !== principalKey);
+    if (remainingRequests.length !== pending.requests.length) {
+      await this.store.savePendingRequests(input.channel, { requests: remainingRequests }, accountId);
     }
   }
 }

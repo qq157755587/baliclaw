@@ -143,4 +143,46 @@ describe("PairingService", () => {
       await rm(home, { recursive: true, force: true });
     }
   });
+
+  it("approves a principal directly and removes its pending requests", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-pairing-service-approve-principal-"));
+    const store = new PairingStore(getAppPaths(home));
+    const service = new PairingService(store);
+    const now = new Date("2026-03-22T10:00:00.000Z");
+
+    try {
+      await service.getOrCreatePendingRequest({
+        channel: "wechat",
+        principalKey: "wx-user-1",
+        now
+      });
+      await service.getOrCreatePendingRequest({
+        channel: "wechat",
+        principalKey: "wx-user-2",
+        now
+      });
+
+      await service.approvePrincipal({
+        channel: "wechat",
+        principalKey: "wx-user-1"
+      });
+
+      await expect(service.isApprovedPrincipal({
+        channel: "wechat",
+        principalKey: "wx-user-1"
+      })).resolves.toBe(true);
+      await expect(store.loadAllowlist("wechat")).resolves.toEqual({
+        approvedPrincipalKeys: ["wx-user-1"]
+      });
+      await expect(store.loadPendingRequests("wechat")).resolves.toEqual({
+        requests: [
+          expect.objectContaining({
+            principalKey: "wx-user-2"
+          })
+        ]
+      });
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
 });

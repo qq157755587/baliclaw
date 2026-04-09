@@ -213,6 +213,70 @@ describe("IpcServer", () => {
     }
   });
 
+  it("serves channel login start and wait routes over the configured unix socket", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-ipc-login-"));
+    const paths = getAppPaths(home);
+    const server = new IpcServer({
+      paths,
+      supportedLoginChannels: ["wechat"],
+      channelControlService: {
+        startLogin: async () => ({
+          channel: "wechat",
+          sessionKey: "session-123",
+          qrDataUrl: "https://example.com/qr",
+          message: "Scan the QR code with WeChat to complete login."
+        }),
+        waitForLogin: async () => ({
+          channel: "wechat",
+          connected: true,
+          message: "WeChat login completed."
+        })
+      } as never
+    });
+
+    try {
+      await server.start();
+
+      await expect(
+        requestJson(paths.socketFile, "/v1/channels/login/start", {
+          method: "POST",
+          body: {
+            channel: "wechat"
+          }
+        })
+      ).resolves.toEqual({
+        statusCode: 200,
+        body: {
+          channel: "wechat",
+          sessionKey: "session-123",
+          qrDataUrl: "https://example.com/qr",
+          message: "Scan the QR code with WeChat to complete login."
+        }
+      });
+
+      await expect(
+        requestJson(paths.socketFile, "/v1/channels/login/wait", {
+          method: "POST",
+          body: {
+            channel: "wechat",
+            sessionKey: "session-123",
+            timeoutMs: 5000
+          }
+        })
+      ).resolves.toEqual({
+        statusCode: 200,
+        body: {
+          channel: "wechat",
+          connected: true,
+          message: "WeChat login completed."
+        }
+      });
+    } finally {
+      await server.stop();
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
   it("serves scheduled task management routes over the configured unix socket", async () => {
     const home = await mkdtemp(join(tmpdir(), "bc-ipc-st-"));
     const paths = getAppPaths(home);

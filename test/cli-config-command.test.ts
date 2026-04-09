@@ -10,6 +10,11 @@ const config: AppConfig = {
     telegram: {
       enabled: false,
       botToken: ""
+    },
+    wechat: {
+      enabled: false,
+      apiBaseUrl: "https://ilinkai.weixin.qq.com",
+      botType: "3"
     }
   },
   runtime: {
@@ -66,6 +71,11 @@ describe("CLI config commands", () => {
         telegram: {
           enabled: false,
           botToken: ""
+        },
+        wechat: {
+          enabled: false,
+          apiBaseUrl: "https://ilinkai.weixin.qq.com",
+          botType: "3"
         }
       },
       runtime: {
@@ -120,6 +130,11 @@ describe("CLI config commands", () => {
           telegram: {
             enabled: false,
             botToken: ""
+          },
+          wechat: {
+            enabled: false,
+            apiBaseUrl: "https://ilinkai.weixin.qq.com",
+            botType: "3"
           }
         },
         runtime: {
@@ -174,7 +189,8 @@ describe("CLI config commands", () => {
         telegram: {
           enabled: false,
           botToken: "8793336326:example-token"
-        }
+        },
+        wechat: config.channels.wechat
       }
     });
     expect(output).toContain("\"botToken\": \"8793336326:example-token\"");

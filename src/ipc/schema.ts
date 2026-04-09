@@ -7,6 +7,7 @@ import {
 import { scheduledTaskStatusEntrySchema } from "../runtime/scheduled-task-status-store.js";
 
 const pairingChannelSchema = z.string().trim().min(1);
+const channelLoginChannelSchema = z.string().trim().min(1);
 
 export const pairingRequestSchema = z.object({
   channel: z.string(),
@@ -67,6 +68,30 @@ export const pairingListResponseSchema = z.object({
   requests: z.array(pairingRequestSchema)
 });
 
+export const channelLoginStartRequestSchema = z.object({
+  channel: channelLoginChannelSchema,
+  force: z.boolean().optional()
+});
+
+export const channelLoginStartResponseSchema = z.object({
+  channel: channelLoginChannelSchema,
+  sessionKey: z.string(),
+  qrDataUrl: z.string().optional(),
+  message: z.string()
+});
+
+export const channelLoginWaitRequestSchema = z.object({
+  channel: channelLoginChannelSchema,
+  sessionKey: z.string().trim().min(1),
+  timeoutMs: z.number().int().positive().optional()
+});
+
+export const channelLoginWaitResponseSchema = z.object({
+  channel: channelLoginChannelSchema,
+  connected: z.boolean(),
+  message: z.string()
+});
+
 export const pairingApproveRequestSchema = z.object({
   channel: pairingChannelSchema,
   code: z.string().trim().min(1)
@@ -97,6 +122,10 @@ export type ScheduledTaskDeleteRequest = z.infer<typeof scheduledTaskDeleteReque
 export type ScheduledTaskDeleteResponse = z.infer<typeof scheduledTaskDeleteResponseSchema>;
 export type ScheduledTaskStatusResponse = z.infer<typeof scheduledTaskStatusResponseSchema>;
 export type PairingListResponse = z.infer<typeof pairingListResponseSchema>;
+export type ChannelLoginStartRequest = z.infer<typeof channelLoginStartRequestSchema>;
+export type ChannelLoginStartResponse = z.infer<typeof channelLoginStartResponseSchema>;
+export type ChannelLoginWaitRequest = z.infer<typeof channelLoginWaitRequestSchema>;
+export type ChannelLoginWaitResponse = z.infer<typeof channelLoginWaitResponseSchema>;
 export type PairingApproveRequest = z.infer<typeof pairingApproveRequestSchema>;
 export type PairingApproveResponse = z.infer<typeof pairingApproveResponseSchema>;
 export type IpcErrorResponse = z.infer<typeof ipcErrorResponseSchema>;

@@ -12,8 +12,10 @@ describe("getAppPaths", () => {
     expect(paths.configFile).toBe("/tmp/example-home/.baliclaw/baliclaw.json5");
     expect(paths.scheduledTasksFile).toBe("/tmp/example-home/.baliclaw/scheduled-tasks.json5");
     expect(paths.socketFile).toBe("/tmp/example-home/.baliclaw/baliclaw.sock");
+    expect(paths.wechatDir).toBe("/tmp/example-home/.baliclaw/wechat");
     expect(paths.pendingPairingFile).toBe("/tmp/example-home/.baliclaw/pairing/telegram/default-pending.json");
     expect(paths.allowlistFile).toBe("/tmp/example-home/.baliclaw/pairing/telegram/default-allowlist.json");
+    expect(paths.wechatStateFile).toBe("/tmp/example-home/.baliclaw/wechat/default.json5");
     expect(paths.scheduledTasksDir).toBe("/tmp/example-home/.baliclaw/scheduled-tasks");
     expect(paths.scheduledTaskStatusFile).toBe("/tmp/example-home/.baliclaw/scheduled-tasks/status.json");
     expect(paths.memoryDir).toBe("/tmp/example-home/.baliclaw/memory");
@@ -33,6 +35,7 @@ describe("ensureStateDirectories", () => {
       const stateDir = await stat(paths.rootDir);
       const workspaceDir = await stat(paths.workspaceDir);
       const pairingDir = await stat(paths.pairingDir);
+      const wechatDir = await stat(paths.wechatDir);
       const scheduledTasksDir = await stat(paths.scheduledTasksDir);
       const memoryGlobalDir = await stat(paths.memoryGlobalDir);
       const memoryProjectsDir = await stat(paths.memoryProjectsDir);
@@ -41,6 +44,7 @@ describe("ensureStateDirectories", () => {
       expect(stateDir.isDirectory()).toBe(true);
       expect(workspaceDir.isDirectory()).toBe(true);
       expect(pairingDir.isDirectory()).toBe(true);
+      expect(wechatDir.isDirectory()).toBe(true);
       expect(scheduledTasksDir.isDirectory()).toBe(true);
       expect(memoryGlobalDir.isDirectory()).toBe(true);
       expect(memoryProjectsDir.isDirectory()).toBe(true);

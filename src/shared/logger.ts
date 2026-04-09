@@ -6,6 +6,7 @@ export const appSubsystems = [
   "config",
   "scheduled-tasks",
   "telegram",
+  "wechat",
   "pairing",
   "session",
   "agent",

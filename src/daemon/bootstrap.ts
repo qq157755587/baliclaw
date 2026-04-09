@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
 import { PairingService } from "../auth/pairing-service.js";
 import type { ChannelAdapter } from "../channel/adapter.js";
+import { ChannelControlService } from "../channel/control.js";
 import { InboundRouter } from "../channel/router.js";
 import { ensureStateDirectories, getAppPaths, type AppPaths } from "../config/paths.js";
 import { ScheduledTaskConfigService } from "../config/scheduled-task-config.js";
@@ -11,6 +12,7 @@ import { AgentService, type ScheduledAgentRunOptions } from "../runtime/agent-se
 import { SessionService } from "../session/service.js";
 import { getLogger } from "../shared/logger.js";
 import { TelegramService, type TelegramPollingBot } from "../telegram/service.js";
+import { WeChatService } from "../wechat/service.js";
 import { ReloadService } from "./reload-service.js";
 import { ScheduledTaskRunError, ScheduledTaskService } from "./scheduled-task-service.js";
 import { createShutdownController, type ShutdownController } from "./shutdown.js";
@@ -26,6 +28,7 @@ export interface BootstrapContext {
   agentService: AgentService;
   channelRouter: InboundRouter;
   telegramService: TelegramService;
+  wechatService: WeChatService;
   scheduledTaskService: ScheduledTaskService;
   reloadService: ReloadService;
   shutdownController: ShutdownController;
@@ -36,6 +39,7 @@ export interface BootstrapOptions {
   configService?: ConfigService;
   ipcServer?: IpcServer;
   telegramService?: TelegramService;
+  wechatService?: WeChatService;
   telegramBot?: TelegramPollingBot;
   pairingService?: PairingService;
   sessionService?: SessionService;
@@ -73,6 +77,9 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   const telegramLogger = getLogger("telegram", {
     level: currentConfig.logging.level
   });
+  const wechatLogger = getLogger("wechat", {
+    level: currentConfig.logging.level
+  });
   const pairingService = options.pairingService ?? new PairingService();
   const sessionService = options.sessionService ?? new SessionService();
   const agentService = options.agentService ?? new AgentService({
@@ -82,6 +89,7 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   const adapters = new Map<string, ChannelAdapter>();
 
   let activeTelegramService = options.telegramService ?? createTelegramService();
+  let activeWeChatService = options.wechatService ?? createWeChatService();
   let activeScheduledTaskService = options.scheduledTaskService ?? new ScheduledTaskService();
 
   const channelRouter = new InboundRouter({
@@ -92,17 +100,18 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     buildAgentRunOptions: (sessionKey) => buildAgentRunOptions(currentConfig, sessionKey)
   });
 
-  const setTelegramInboundHandler = (service: TelegramService): void => {
+  const setAdapterInboundHandler = (service: ChannelAdapter): void => {
     if ("setInboundHandler" in service && typeof service.setInboundHandler === "function") {
       service.setInboundHandler((envelope) => channelRouter.handleInbound(envelope));
     }
   };
 
-  setTelegramInboundHandler(activeTelegramService);
+  setAdapterInboundHandler(activeTelegramService);
+  setAdapterInboundHandler(activeWeChatService);
 
   const activateTelegramService = (service: TelegramService, enabled: boolean): void => {
     activeTelegramService = service;
-    setTelegramInboundHandler(activeTelegramService);
+    setAdapterInboundHandler(activeTelegramService);
 
     if (enabled) {
       adapters.set(activeTelegramService.channelId, activeTelegramService);
@@ -110,6 +119,18 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     }
 
     adapters.delete(activeTelegramService.channelId);
+  };
+
+  const activateWeChatService = (service: WeChatService, enabled: boolean): void => {
+    activeWeChatService = service;
+    setAdapterInboundHandler(activeWeChatService);
+
+    if (enabled) {
+      adapters.set(activeWeChatService.channelId, activeWeChatService);
+      return;
+    }
+
+    adapters.delete(activeWeChatService.channelId);
   };
 
   const sendChannelText = async (
@@ -209,6 +230,39 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     }
   };
 
+  const reconcileWeChatService = async (nextConfig: AppConfig, previousConfig: AppConfig): Promise<void> => {
+    const nextWeChatConfig = getWeChatChannelConfig(nextConfig);
+    const previousWeChatConfig = getWeChatChannelConfig(previousConfig);
+    const wechatChanged = nextWeChatConfig.enabled !== previousWeChatConfig.enabled
+      || nextWeChatConfig.apiBaseUrl !== previousWeChatConfig.apiBaseUrl;
+
+    if (!wechatChanged) {
+      return;
+    }
+
+    if (previousWeChatConfig.enabled) {
+      await activeWeChatService.stop();
+    }
+
+    if (options.wechatService) {
+      activateWeChatService(options.wechatService, nextWeChatConfig.enabled);
+      if (nextWeChatConfig.enabled) {
+        await activeWeChatService.start();
+      }
+      return;
+    }
+
+    const nextService = nextWeChatConfig.enabled
+      ? createWeChatService(nextWeChatConfig.apiBaseUrl)
+      : createWeChatService();
+
+    activateWeChatService(nextService, nextWeChatConfig.enabled);
+
+    if (nextWeChatConfig.enabled) {
+      await activeWeChatService.start();
+    }
+  };
+
   const reconcileScheduledTaskService = async (nextConfig: AppConfig, previousConfig: AppConfig): Promise<void> => {
     const scheduledTasksChanged =
       nextConfig.scheduledTasks.enabled !== previousConfig.scheduledTasks.enabled ||
@@ -255,9 +309,31 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
       agentLogger.level = nextConfig.logging.level;
       scheduledTaskLogger.level = nextConfig.logging.level;
       telegramLogger.level = nextConfig.logging.level;
+      wechatLogger.level = nextConfig.logging.level;
 
       await reconcileTelegramService(nextConfig, previousConfig);
+      await reconcileWeChatService(nextConfig, previousConfig);
       await reconcileScheduledTaskService(nextConfig, previousConfig);
+    }
+  });
+  const channelControlService = new ChannelControlService({
+    configService,
+    getConfig: () => currentConfig,
+    reloadConfig: async () => await reloadService.reload("ipc"),
+    pairingService,
+    onChannelCredentialsUpdated: async (channel) => {
+      const wechatConfig = getWeChatChannelConfig(currentConfig);
+      if (channel !== "wechat" || !wechatConfig.enabled) {
+        return;
+      }
+
+      await activeWeChatService.stop();
+      if (options.wechatService) {
+        activateWeChatService(options.wechatService, true);
+      } else {
+        activateWeChatService(createWeChatService(wechatConfig.apiBaseUrl), true);
+      }
+      await activeWeChatService.start();
     }
   });
   const ipcServer = options.ipcServer ?? new IpcServer({
@@ -265,7 +341,9 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     logger: ipcLogger,
     configService,
     pairingService,
-    supportedPairingChannels: ["telegram"],
+    channelControlService,
+    supportedPairingChannels: ["telegram", "wechat"],
+    supportedLoginChannels: ["wechat"],
     reloadConfig: async () => await reloadService.reload("ipc")
   });
 
@@ -291,6 +369,18 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     activateTelegramService(activeTelegramService, false);
   }
 
+  const currentWeChatConfig = getWeChatChannelConfig(currentConfig);
+  if (currentWeChatConfig.enabled) {
+    if (options.wechatService) {
+      activateWeChatService(options.wechatService, true);
+    } else {
+      activateWeChatService(createWeChatService(currentWeChatConfig.apiBaseUrl), true);
+    }
+    await activeWeChatService.start();
+  } else {
+    activateWeChatService(activeWeChatService, false);
+  }
+
   if (currentConfig.scheduledTasks.enabled) {
     activeScheduledTaskService = options.scheduledTaskService ?? createConfiguredScheduledTaskService(currentConfig);
     await activeScheduledTaskService.start();
@@ -299,6 +389,10 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   shutdownController.add({
     name: "telegram",
     close: async () => activeTelegramService.stop()
+  });
+  shutdownController.add({
+    name: "wechat",
+    close: async () => activeWeChatService.stop()
   });
   shutdownController.add({
     name: "scheduled-tasks",
@@ -323,6 +417,7 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     agentService,
     channelRouter,
     telegramService: activeTelegramService,
+    wechatService: activeWeChatService,
     scheduledTaskService: activeScheduledTaskService,
     reloadService,
     shutdownController
@@ -335,6 +430,13 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
       ...(options.sendText ? { sendText: options.sendText } : {}),
       ...(options.createTypingHeartbeat ? { createTypingHeartbeat: options.createTypingHeartbeat } : {}),
       logger: telegramLogger
+    });
+  }
+
+  function createWeChatService(apiBaseUrl = ""): WeChatService {
+    return new WeChatService({
+      apiBaseUrl: apiBaseUrl || getWeChatChannelConfig(currentConfig).apiBaseUrl,
+      logger: wechatLogger
     });
   }
 }
@@ -391,5 +493,22 @@ function toDeliveryTarget(target: {
     chatType: target.chatType,
     conversationId: target.conversationId,
     ...(target.threadId ? { threadId: target.threadId } : {})
+  };
+}
+
+function getWeChatChannelConfig(config: {
+  channels?: {
+    wechat?: {
+      enabled?: boolean;
+      apiBaseUrl?: string;
+      botType?: string;
+    };
+  };
+}) {
+  const wechat = config.channels?.wechat;
+  return {
+    enabled: wechat?.enabled ?? false,
+    apiBaseUrl: wechat?.apiBaseUrl ?? "https://ilinkai.weixin.qq.com",
+    botType: wechat?.botType ?? "3"
   };
 }

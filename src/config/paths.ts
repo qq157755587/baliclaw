@@ -9,6 +9,7 @@ export interface AppPaths {
   scheduledTasksFile: string;
   socketFile: string;
   pairingDir: string;
+  wechatDir: string;
   sessionDir: string;
   scheduledTasksDir: string;
   scheduledTaskStatusFile: string;
@@ -18,6 +19,7 @@ export interface AppPaths {
   claudeSessionMapFile: string;
   pendingPairingFile: string;
   allowlistFile: string;
+  wechatStateFile: string;
   logsDir: string;
   logFile: string;
 }
@@ -26,6 +28,7 @@ export function getAppPaths(home = homedir()): AppPaths {
   const rootDir = join(home, ".baliclaw");
   const workspaceDir = join(rootDir, "workspace");
   const pairingDir = join(rootDir, "pairing");
+  const wechatDir = join(rootDir, "wechat");
   const sessionDir = join(rootDir, "sessions");
   const scheduledTasksDir = join(rootDir, "scheduled-tasks");
   const memoryDir = join(rootDir, "memory");
@@ -42,6 +45,7 @@ export function getAppPaths(home = homedir()): AppPaths {
     scheduledTasksFile: join(rootDir, "scheduled-tasks.json5"),
     socketFile: join(rootDir, "baliclaw.sock"),
     pairingDir,
+    wechatDir,
     sessionDir,
     scheduledTasksDir,
     scheduledTaskStatusFile: join(scheduledTasksDir, "status.json"),
@@ -51,6 +55,7 @@ export function getAppPaths(home = homedir()): AppPaths {
     claudeSessionMapFile: join(sessionDir, "claude-sessions.json"),
     pendingPairingFile,
     allowlistFile,
+    wechatStateFile: join(wechatDir, "default.json5"),
     logsDir,
     logFile: join(logsDir, "daemon.log")
   };
@@ -61,6 +66,7 @@ export async function ensureStateDirectories(paths: AppPaths = getAppPaths()): P
     mkdir(paths.rootDir, { recursive: true }),
     mkdir(paths.workspaceDir, { recursive: true }),
     mkdir(paths.pairingDir, { recursive: true }),
+    mkdir(paths.wechatDir, { recursive: true }),
     mkdir(paths.sessionDir, { recursive: true }),
     mkdir(paths.scheduledTasksDir, { recursive: true }),
     mkdir(paths.memoryGlobalDir, { recursive: true }),

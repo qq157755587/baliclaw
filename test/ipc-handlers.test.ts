@@ -8,6 +8,11 @@ const config: AppConfig = {
     telegram: {
       enabled: false,
       botToken: ""
+    },
+    wechat: {
+      enabled: false,
+      apiBaseUrl: "https://ilinkai.weixin.qq.com",
+      botType: "3"
     }
   },
   runtime: {
@@ -26,6 +31,15 @@ const config: AppConfig = {
   scheduledTasks: {
     enabled: false,
     file: ""
+  },
+  mcp: {
+    servers: {}
+  },
+  agents: {},
+  memory: {
+    enabled: true,
+    globalEnabled: false,
+    maxLines: 200
   }
 };
 
