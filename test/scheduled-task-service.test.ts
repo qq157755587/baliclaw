@@ -46,6 +46,108 @@ describe("ScheduledTaskService", () => {
     await service.stop();
   });
 
+  it("schedules the next daily run after the current scheduled instant", async () => {
+    const watcher = new FakeWatcher();
+    const handlers: Array<() => void> = [];
+    const setTimeoutFn = vi.fn((handler: () => void, _delay: number) => {
+      handlers.push(handler);
+      return handlers.length as never;
+    });
+    const now = new Date(2026, 3, 8, 9, 0, 0, 0);
+    const service = new ScheduledTaskService({
+      configService: {
+        getPath: () => "/tmp/scheduled-tasks.json5",
+        load: vi.fn(async (): Promise<ScheduledTaskFileConfig> => ({
+          tasks: {
+            dailySummary: {
+              schedule: {
+                kind: "daily",
+                time: "09:00"
+              },
+              prompt: "Summarize",
+              delivery: {
+                channel: "telegram",
+                accountId: "default",
+                chatType: "direct",
+                conversationId: "42"
+              },
+              timeoutMinutes: 30
+            }
+          }
+        }))
+      } as never,
+      statusStore: {
+        set: vi.fn(async () => undefined)
+      } as never,
+      watchConfigDirectory: vi.fn(() => watcher) as never,
+      setTimeoutFn,
+      clearTimeoutFn: vi.fn(),
+      onTrigger: vi.fn(async () => undefined),
+      now: () => now
+    });
+
+    await service.start();
+    expect(setTimeoutFn.mock.calls[0]?.[1]).toBe(0);
+
+    handlers[0]?.();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(setTimeoutFn.mock.calls[1]?.[1]).toBe(24 * 60 * 60 * 1000);
+
+    await service.stop();
+  });
+
+  it("preserves everyHours cadence without millisecond drift", async () => {
+    const watcher = new FakeWatcher();
+    const handlers: Array<() => void> = [];
+    const setTimeoutFn = vi.fn((handler: () => void, _delay: number) => {
+      handlers.push(handler);
+      return handlers.length as never;
+    });
+    const now = new Date("2026-04-08T08:00:00.000Z");
+    const service = new ScheduledTaskService({
+      configService: {
+        getPath: () => "/tmp/scheduled-tasks.json5",
+        load: vi.fn(async (): Promise<ScheduledTaskFileConfig> => ({
+          tasks: {
+            hourlySummary: {
+              schedule: {
+                kind: "everyHours",
+                intervalHours: 1
+              },
+              prompt: "Summarize",
+              delivery: {
+                channel: "telegram",
+                accountId: "default",
+                chatType: "direct",
+                conversationId: "42"
+              },
+              timeoutMinutes: 30
+            }
+          }
+        }))
+      } as never,
+      statusStore: {
+        set: vi.fn(async () => undefined)
+      } as never,
+      watchConfigDirectory: vi.fn(() => watcher) as never,
+      setTimeoutFn,
+      clearTimeoutFn: vi.fn(),
+      onTrigger: vi.fn(async () => undefined),
+      now: () => now
+    });
+
+    await service.start();
+    handlers[0]?.();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(setTimeoutFn.mock.calls[1]?.[1]).toBe(2 * 60 * 60 * 1000);
+
+    await service.stop();
+  });
+
   it("marks runs as skipped when a previous run is still active", async () => {
     const watcher = new FakeWatcher();
     const handlers: Array<() => void> = [];
@@ -103,6 +205,82 @@ describe("ScheduledTaskService", () => {
         status: "skipped",
         reason: "previous run still active"
       })
+    );
+
+    await service.stop();
+  });
+
+  it("logs skip handler failures without rejecting the scheduled run", async () => {
+    const watcher = new FakeWatcher();
+    const handlers: Array<() => void> = [];
+    const setTimeoutFn = vi.fn((handler: () => void, _delay: number) => {
+      handlers.push(handler);
+      return handlers.length as never;
+    });
+    const logger = {
+      info: vi.fn(),
+      error: vi.fn()
+    };
+    const statusStore = {
+      set: vi.fn(async () => undefined)
+    } as never;
+    let currentTime = new Date(2026, 3, 8, 8, 0, 0, 0);
+    const service = new ScheduledTaskService({
+      configService: {
+        getPath: () => "/tmp/scheduled-tasks.json5",
+        load: vi.fn(async (): Promise<ScheduledTaskFileConfig> => ({
+          tasks: {
+            dailySummary: {
+              schedule: {
+                kind: "everyHours",
+                intervalHours: 1
+              },
+              prompt: "Summarize",
+              delivery: {
+                channel: "telegram",
+                accountId: "default",
+                chatType: "direct",
+                conversationId: "42"
+              },
+              timeoutMinutes: 30
+            }
+          }
+        }))
+      } as never,
+      logger: logger as never,
+      statusStore,
+      watchConfigDirectory: vi.fn(() => watcher) as never,
+      setTimeoutFn,
+      clearTimeoutFn: vi.fn(),
+      onTrigger: vi.fn(async () => {
+        currentTime = new Date(2026, 3, 8, 9, 0, 0, 0);
+        await new Promise(() => undefined);
+      }),
+      onSkip: vi.fn(async () => {
+        throw new Error("telegram rate limited");
+      }),
+      now: () => currentTime
+    });
+
+    await service.start();
+    handlers[0]?.();
+    handlers[0]?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(statusStore.set).toHaveBeenCalledWith(
+      "dailySummary",
+      expect.objectContaining({
+        status: "skipped",
+        reason: "previous run still active"
+      })
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskId: "dailySummary"
+      }),
+      "scheduled task skip handler failed"
     );
 
     await service.stop();

@@ -169,7 +169,9 @@ export class ScheduledTaskService {
     const delayMs = Math.max(0, scheduledFor.getTime() - this.now().getTime());
     const scheduledAt = scheduledFor.toISOString();
     const timer = this.setTimeoutFn(() => {
-      void this.fireTask(taskId, task, scheduledAt);
+      void this.fireTask(taskId, task, scheduledAt).catch((error: unknown) => {
+        this.logger.error({ err: error, taskId, scheduledAt }, "scheduled task fire failed");
+      });
     }, delayMs);
 
     this.activeTimers.set(taskId, {
@@ -181,7 +183,7 @@ export class ScheduledTaskService {
 
   private async fireTask(taskId: string, task: ScheduledTaskDefinitionConfig, scheduledAt: string): Promise<void> {
     this.activeTimers.delete(taskId);
-    this.scheduleTask(taskId, task, new Date(scheduledAt));
+    this.scheduleTask(taskId, task, getNextScheduleBaseDate(task, scheduledAt));
 
     if (this.runningTasks.has(taskId)) {
       const reason = "previous run still active";
@@ -191,12 +193,16 @@ export class ScheduledTaskService {
         status: "skipped",
         reason
       });
-      await this.onSkip({
-        taskId,
-        task,
-        scheduledAt,
-        reason
-      });
+      try {
+        await this.onSkip({
+          taskId,
+          task,
+          scheduledAt,
+          reason
+        });
+      } catch (error) {
+        this.logger.error({ err: error, taskId, scheduledAt }, "scheduled task skip handler failed");
+      }
       return;
     }
 
@@ -248,4 +254,14 @@ function shouldReloadForFile(configFile: string, filename: string | Buffer | nul
   }
 
   return filename.toString() === basename(configFile);
+}
+
+function getNextScheduleBaseDate(task: ScheduledTaskDefinitionConfig, scheduledAt: string): Date {
+  const scheduledDate = new Date(scheduledAt);
+
+  if (task.schedule.kind === "everyHours") {
+    return scheduledDate;
+  }
+
+  return new Date(scheduledDate.getTime() + 1);
 }
