@@ -78,6 +78,12 @@ export interface SendMessageReq {
   msg?: WeChatMessage | undefined;
 }
 
+export interface WeChatApiStatusResp {
+  ret?: number | undefined;
+  errcode?: number | undefined;
+  errmsg?: string | undefined;
+}
+
 export interface GetConfigResp {
   ret?: number | undefined;
   errmsg?: string | undefined;

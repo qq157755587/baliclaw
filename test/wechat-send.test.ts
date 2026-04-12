@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { sendMessage } from "../src/channel/wechat/api.js";
 import { createWeChatTypingHeartbeat, sendWeChatText, WeChatSendError } from "../src/channel/wechat/send.js";
 
 const directTarget = {
@@ -51,6 +52,41 @@ describe("sendWeChatText", () => {
       },
       vi.fn()
     )).rejects.toThrowError(new WeChatSendError("WeChat text message must not be empty"));
+  });
+
+  it("rejects WeChat API business errors", async () => {
+    const sendMessageImpl = vi.fn().mockRejectedValue(new Error("sendmessage returned ret=-2"));
+
+    await expect(sendWeChatText(
+      directTarget,
+      "hello",
+      {
+        apiBaseUrl: "https://ilinkai.weixin.qq.com",
+        token: "secret-token"
+      },
+      sendMessageImpl
+    )).rejects.toThrowError(/ret=-2/);
+  });
+});
+
+describe("sendMessage", () => {
+  it("rejects non-zero WeChat business return codes", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      text: async () => JSON.stringify({ ret: -2 })
+    } as Response);
+
+    await expect(sendMessage({
+      baseUrl: "https://ilinkai.weixin.qq.com",
+      token: "secret-token",
+      body: {
+        msg: {
+          to_user_id: "wx-user-1"
+        }
+      }
+    })).rejects.toThrow("sendmessage returned ret=-2");
+
+    fetchMock.mockRestore();
   });
 });
 

@@ -8,7 +8,8 @@ import type {
   QrCodeResponse,
   QrStatusResponse,
   SendMessageReq,
-  SendTypingReq
+  SendTypingReq,
+  WeChatApiStatusResp
 } from "./types.js";
 
 const DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000;
@@ -196,7 +197,7 @@ export async function sendMessage(
     signal?: AbortSignal | undefined;
   }
 ): Promise<void> {
-  await postJson<Record<string, never>>({
+  const response = await postJson<WeChatApiStatusResp>({
     baseUrl: params.baseUrl,
     endpoint: "ilink/bot/sendmessage",
     body: {
@@ -207,6 +208,7 @@ export async function sendMessage(
     timeoutMs: params.timeoutMs ?? DEFAULT_API_TIMEOUT_MS,
     signal: params.signal
   });
+  assertApiSuccess("sendmessage", response);
 }
 
 export async function getConfig(
@@ -236,7 +238,7 @@ export async function sendTyping(
     signal?: AbortSignal | undefined;
   }
 ): Promise<void> {
-  await postJson<Record<string, never>>({
+  const response = await postJson<WeChatApiStatusResp>({
     baseUrl: params.baseUrl,
     endpoint: "ilink/bot/sendtyping",
     body: {
@@ -247,4 +249,15 @@ export async function sendTyping(
     timeoutMs: params.timeoutMs ?? DEFAULT_LIGHTWEIGHT_TIMEOUT_MS,
     signal: params.signal
   });
+  assertApiSuccess("sendtyping", response);
+}
+
+function assertApiSuccess(operation: string, response: WeChatApiStatusResp): void {
+  const ret = response.ret ?? response.errcode;
+  if (ret === undefined || ret === 0) {
+    return;
+  }
+
+  const message = response.errmsg?.trim();
+  throw new Error(`${operation} returned ret=${ret}${message ? `: ${message}` : ""}`);
 }
