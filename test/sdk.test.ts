@@ -18,6 +18,7 @@ describe("queryAgent", () => {
         permissionMode?: string;
         allowDangerouslySkipPermissions?: boolean;
         tools?: string[];
+        allowedTools?: string[];
         settingSources?: string[];
         mcpServers?: Record<string, unknown>;
         agents?: Record<string, { description: string; prompt: string }>;
@@ -168,6 +169,7 @@ describe("queryAgent", () => {
         }
       })
     });
+    expect(query.mock.calls[0]?.[0].options).not.toHaveProperty("allowedTools");
     expect(readMemory).toHaveBeenCalledWith({
       paths,
       workingDirectory: "/tmp/project",
@@ -388,7 +390,7 @@ describe("queryAgent", () => {
     expect(query.mock.calls[0]?.[0].options).not.toHaveProperty("sessionId");
   });
 
-  it("uses dontAsk without dangerous skip when running as root", async () => {
+  it("uses dontAsk with pre-approved tools and without dangerous skip when running as root", async () => {
     const originalGetuid = process.getuid;
     const query = vi.fn(async function* () {
       yield {
@@ -419,7 +421,8 @@ describe("queryAgent", () => {
         {
           prompt: "hello",
           sessionId: "telegram:default:direct:42",
-          cwd: "/tmp/project"
+          cwd: "/tmp/project",
+          loadFilesystemSettings: true
         },
         {
           buildSystemPrompt: vi.fn().mockResolvedValue("prompt"),
@@ -439,7 +442,8 @@ describe("queryAgent", () => {
       prompt: "hello",
       options: expect.objectContaining({
         permissionMode: "dontAsk",
-        tools: ["Bash", "Read", "Write", "Edit"]
+        tools: ["Bash", "Read", "Write", "Edit", "Skill"],
+        allowedTools: ["Bash", "Read", "Write", "Edit", "Skill"]
       })
     });
     expect(query.mock.calls[0]?.[0].options).not.toHaveProperty("allowDangerouslySkipPermissions");

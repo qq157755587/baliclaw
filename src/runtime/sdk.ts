@@ -216,6 +216,7 @@ interface SdkQueryOptions {
   permissionMode: "bypassPermissions" | "dontAsk";
   allowDangerouslySkipPermissions?: true;
   tools: string[];
+  allowedTools?: string[];
   mcpServers?: Record<string, SdkMcpServerConfig>;
   settingSources?: ["user", "project"];
   agents?: Record<string, SdkAgentDefinition>;
@@ -255,6 +256,9 @@ function createSdkQueryOptions(params: {
 
   if (params.toolPolicy.allowDangerouslySkipPermissions) {
     options.allowDangerouslySkipPermissions = true;
+  }
+  if (params.toolPolicy.permissionMode === "dontAsk") {
+    options.allowedTools = params.toolPolicy.tools;
   }
 
   if (params.resumeSessionId) {
